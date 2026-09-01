@@ -1,0 +1,18 @@
+{
+  "name": "attendxsuite-pwa-kiosk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 8062",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 8062"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.511.0"
+  }
+}

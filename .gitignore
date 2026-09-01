@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+pwa-kiosk/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+
+# Environment and secrets
+.env
+*.env
+!.env.example
+backend/.env
+hf-face-api/.env
+
+# Logs and runtime output
+*.log
+*.err.log
+.backend.log
+.backend.err.log
+.frontend.log
+.frontend.err.log
+.mongo.log
+.mongo.err.log
+.pwa.log
+.pwa.err.log
+.tunnel-*.log
+.tunnel-*.err.log
+
+# Build outputs
+dist/
+frontend/dist/
+pwa-kiosk/dist/
+
+# Local databases and generated data
+backend/local-data/
+backend/mongo-data/
+*.sqlite
+*.db
+
+# Downloaded local toolchains
+tools/mongodb-*.zip
+tools/mongodb-win32-x86_64-windows-*/
+
+# Local tunnel artifacts
+attendxsuite-pwa-qr.png

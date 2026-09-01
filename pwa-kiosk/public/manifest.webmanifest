@@ -1,0 +1,8 @@
+{
+  "name": "Attendify Kiosk",
+  "short_name": "Attendify",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050816",
+  "theme_color": "#050816"
+}
