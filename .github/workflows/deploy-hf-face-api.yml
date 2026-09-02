@@ -3,9 +3,6 @@ name: Deploy HF Gradio Face API
 on:
   push:
     branches: [main]
-    paths:
-      - "hf-face-api/**"
-      - ".github/workflows/deploy-hf-face-api.yml"
   workflow_dispatch:
 
 jobs:
