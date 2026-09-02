@@ -7,11 +7,27 @@ import gradio as gr
 
 from face_core import FaceApiError, embed_base64, match_base64, require_api_token
 
+try:
+    import spaces
+except ImportError:
+    spaces = None
+
+
+def gpu_task(duration: int = 60):
+    if spaces:
+        return spaces.GPU(duration=duration)
+
+    def decorator(fn):
+        return fn
+
+    return decorator
+
 
 def health() -> dict:
     return {"success": True, "message": "AttendXsuite Gradio face API running"}
 
 
+@gpu_task(duration=60)
 def embed(image_base64: str, api_token: str, model: str | None = None) -> dict:
     try:
         require_api_token(api_token)
@@ -20,6 +36,7 @@ def embed(image_base64: str, api_token: str, model: str | None = None) -> dict:
         return {"success": False, "detail": error.detail, "status_code": error.status_code}
 
 
+@gpu_task(duration=60)
 def match(image_base64: str, employees: list[dict[str, Any]], api_token: str, threshold: float = 0.48, margin: float = 0.06) -> dict:
     try:
         require_api_token(api_token)
