@@ -79,6 +79,7 @@ Start Command: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ENVIRONMENT=production
 PYTHON_VERSION=3.11.11
 MONGODB_URI=<your-mongodb-atlas-uri>
+MONGODB_DATABASE=attendxsuite
 JWT_SECRET=<make-a-long-random-secret>
 CLIENT_ORIGINS=<dashboard-url>,<pwa-url>
 COMPANY_TIMEZONE=Asia/Kolkata

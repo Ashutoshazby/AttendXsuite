@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     port: int = 8070
     mongodb_uri: str = "mongodb://127.0.0.1:27017/attendxsuite"
+    mongodb_database: str = "attendxsuite"
     jwt_secret: str = "attendxsuite_local_secret"
     jwt_expire_minutes: int = 43200
     client_origins: str = "http://127.0.0.1:8061,http://localhost:8061"

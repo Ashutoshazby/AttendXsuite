@@ -174,7 +174,7 @@ async def connect_db() -> None:
         return
     settings = get_settings()
     client = AsyncIOMotorClient(settings.mongodb_uri, serverSelectionTimeoutMS=2000)
-    db = client.get_default_database()
+    db = client.get_database(settings.mongodb_database)
     try:
         await db.command("ping")
         await db.companies.create_index("admin_email", unique=True)

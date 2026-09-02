@@ -16,6 +16,8 @@ services:
         generateValue: true
       - key: MONGODB_URI
         sync: false
+      - key: MONGODB_DATABASE
+        value: attendxsuite
       - key: COMPANY_TIMEZONE
         value: Asia/Kolkata
       - key: FACE_ENGINE
