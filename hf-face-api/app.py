@@ -39,6 +39,8 @@ def embed(image_base64: str, api_token: str, model: str | None = None) -> dict:
         return {"success": True, "data": embed_base64(image_base64, model)}
     except FaceApiError as error:
         return {"success": False, "detail": error.detail, "status_code": error.status_code}
+    except Exception as error:
+        return {"success": False, "detail": f"Face engine crashed: {error}", "status_code": 503}
 
 
 @gpu_task(duration=scan_duration)
@@ -48,6 +50,8 @@ def embed_many(frames: list[str], api_token: str, model: str | None = None) -> d
         return {"success": True, "data": embed_many_base64((frames or [])[:5], model)}
     except FaceApiError as error:
         return {"success": False, "detail": error.detail, "status_code": error.status_code}
+    except Exception as error:
+        return {"success": False, "detail": f"Face engine crashed: {error}", "status_code": 503}
 
 
 @gpu_task(duration=30)
@@ -57,6 +61,8 @@ def match(image_base64: str, employees: list[dict[str, Any]], api_token: str, th
         return {"success": True, "data": match_base64(image_base64, employees, threshold, margin)}
     except FaceApiError as error:
         return {"success": False, "detail": error.detail, "status_code": error.status_code}
+    except Exception as error:
+        return {"success": False, "detail": f"Face engine crashed: {error}", "status_code": 503}
 
 
 with gr.Blocks(title="AttendXsuite Face API") as demo:

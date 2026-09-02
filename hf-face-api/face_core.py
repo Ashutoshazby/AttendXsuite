@@ -53,7 +53,13 @@ def fallback_embedding(image: np.ndarray) -> list[float]:
 def embed_image(image: np.ndarray, model_name: str) -> dict:
     face_app = get_face_app(model_name)
     if face_app:
-        faces = face_app.get(image)
+        try:
+            faces = face_app.get(image)
+        except Exception as error:
+            print(f"[AttendXsuite HF] InsightFace runtime failed, using fallback: {error}")
+            faces = []
+            face_app = None
+    if face_app:
         if len(faces) != 1:
             raise FaceApiError(422, "Exactly one clear face is required")
         face = faces[0]
@@ -80,7 +86,16 @@ def embed_base64(image_base64: str, model_name: str | None = None) -> dict:
 
 
 def embed_many_base64(frames: list[str], model_name: str | None = None) -> list[dict]:
-    return [embed_base64(frame, model_name) for frame in frames]
+    results = []
+    errors = []
+    for frame in frames:
+        try:
+            results.append(embed_base64(frame, model_name))
+        except FaceApiError as error:
+            errors.append(error.detail)
+    if not results and errors:
+        raise FaceApiError(422, errors[-1])
+    return results
 
 
 def cosine(left: list[float], right: list[float]) -> float:
