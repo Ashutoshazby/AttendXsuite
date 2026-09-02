@@ -46,15 +46,19 @@ def _opencv_embedding(image_base64: str) -> dict:
     if face_region.size == 0:
         face_region = gray
         face_box = [0, 0, int(image.shape[1]), int(image.shape[0])]
-    face = cv2.resize(face_region, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
-    face = cv2.equalizeHist((face * 255).astype(np.uint8)).astype(np.float32) / 255.0
-    vector = face.flatten()
+    face = cv2.resize(face_region, (40, 40), interpolation=cv2.INTER_AREA)
+    face = cv2.equalizeHist(face).astype(np.float32) / 255.0
+    face = (face - float(face.mean())) / (float(face.std()) + 1e-6)
+    gradient_x = cv2.Sobel(face, cv2.CV_32F, 1, 0, ksize=3)
+    gradient_y = cv2.Sobel(face, cv2.CV_32F, 0, 1, ksize=3)
+    texture = cv2.resize(np.sqrt((gradient_x * gradient_x) + (gradient_y * gradient_y)), (20, 20), interpolation=cv2.INTER_AREA)
+    vector = np.concatenate([face.flatten(), texture.flatten()])
     norm = np.linalg.norm(vector) or 1.0
     embedding = (vector / norm).tolist()
     return {
         "embedding": embedding,
         "face_box": face_box,
-        "quality": {"engine": "opencv-fallback", "usable": True},
+        "quality": {"engine": "opencv-fallback", "feature_version": 2, "usable": True},
         "model": "opencv-fallback"
     }
 
@@ -206,6 +210,9 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 
 def best_match(embedding: list[float], employees: list[dict]) -> dict:
     settings = get_settings()
+    fallback_mode = len(embedding) == 2000
+    threshold = 0.64 if fallback_mode else settings.face_match_threshold
+    margin = 0.12 if fallback_mode else settings.face_match_margin
     scored_by_employee = {}
     for employee in employees:
         vectors = employee.get("face_embeddings") or []
@@ -218,9 +225,9 @@ def best_match(embedding: list[float], employees: list[dict]) -> dict:
             if not current or score > current["score"]:
                 scored_by_employee[employee_id] = {"employee": employee, "score": score}
     scored = sorted(scored_by_employee.values(), key=lambda item: item["score"], reverse=True)
-    if not scored or scored[0]["score"] < settings.face_match_threshold:
+    if not scored or scored[0]["score"] < threshold:
         raise HTTPException(status_code=422, detail="Face not recognized. Please scan again.")
     second = scored[1]["score"] if len(scored) > 1 else -1
-    if scored[0]["score"] - second < settings.face_match_margin:
+    if scored[0]["score"] - second < margin:
         raise HTTPException(status_code=422, detail="Face match is uncertain. Please scan again in better light.")
     return {"employee": scored[0]["employee"], "score": scored[0]["score"], "second_score": second}
