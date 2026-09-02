@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Banknote, CalendarDays, Camera, CheckCircle2, Clock3, LogOut, Plus, RefreshCw, Save, ShieldCheck, Trash2, UserCog, UserPlus, Users } from "lucide-react";
+import { Activity, Banknote, CalendarDays, Camera, CheckCircle2, Clock3, LogOut, Menu, Plus, RefreshCw, Save, ShieldCheck, Trash2, UserCog, UserPlus, Users, X } from "lucide-react";
 import { createRoot } from "react-dom/client";
 
 import { API_BASE, request } from "./api";
@@ -88,6 +88,7 @@ function App() {
   const [faceCameraReady, setFaceCameraReady] = useState(false);
   const [attendanceCandidate, setAttendanceCandidate] = useState(null);
   const [attendanceCameraReady, setAttendanceCameraReady] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Ready.");
 
@@ -112,6 +113,7 @@ function App() {
 
   const openPage = (nextPage) => {
     setPage(nextPage);
+    setNavOpen(false);
     setMessage("Ready.");
   };
 
@@ -364,7 +366,10 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand"><ShieldCheck size={26} /><div><strong>AttendXsuite</strong><span>Hospital attendance</span></div></div>
-        <nav>
+        <button type="button" className="menu-toggle" onClick={() => setNavOpen((value) => !value)} aria-label={navOpen ? "Close menu" : "Open menu"}>
+          {navOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+        <nav className={navOpen ? "open" : ""}>
           {pages.map(([key, label, Icon]) => (
             <button key={key} type="button" className={page === key ? "active" : ""} onClick={() => openPage(key)}><Icon size={18} /> {label}</button>
           ))}
