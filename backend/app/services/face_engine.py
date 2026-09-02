@@ -58,29 +58,36 @@ async def create_embedding(image_base64: str) -> dict:
     if settings.face_engine == "huggingface":
         if not settings.hf_face_api_url:
             raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
-        fastapi_error = None
-        try:
-            async with httpx.AsyncClient(timeout=settings.hf_timeout_seconds) as client:
-                response = await client.post(
-                    f"{settings.hf_face_api_url.rstrip('/')}/embed",
-                    headers={"Authorization": f"Bearer {settings.hf_face_api_token}"},
-                    json={"image_base64": image_base64, "model": settings.hf_face_model}
-                )
-            if response.status_code >= 500:
-                raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
-            if response.status_code >= 400:
-                fastapi_error = HTTPException(status_code=response.status_code, detail=response.json().get("detail", "Face could not be processed"))
-            else:
-                return response.json()["data"]
-        except httpx.HTTPError as error:
-            fastapi_error = error
         try:
             return await _gradio_embedding(image_base64, settings)
+        except HTTPException:
+            raise
+        except Exception as gradio_error:
+            fastapi_error = gradio_error
+        try:
+            return await _fastapi_embedding(image_base64, settings)
+        except HTTPException:
+            raise
         except Exception:
-            if isinstance(fastapi_error, HTTPException):
-                raise fastapi_error
-            raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
+            raise HTTPException(status_code=503, detail=f"Face service is not ready: {fastapi_error}")
     return _opencv_embedding(image_base64)
+
+
+async def _fastapi_embedding(image_base64: str, settings) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=settings.hf_timeout_seconds) as client:
+            response = await client.post(
+                f"{settings.hf_face_api_url.rstrip('/')}/embed",
+                headers={"Authorization": f"Bearer {settings.hf_face_api_token}"},
+                json={"image_base64": image_base64, "model": settings.hf_face_model}
+            )
+        if response.status_code >= 500:
+            raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail=response.json().get("detail", "Face could not be processed"))
+        return response.json()["data"]
+    except httpx.HTTPError:
+        raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
 
 
 async def create_embeddings(frames: list[str]) -> list[dict]:

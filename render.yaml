@@ -29,7 +29,7 @@ services:
       - key: HF_FACE_MODEL
         value: buffalo_s
       - key: HF_TIMEOUT_SECONDS
-        value: 30
+        value: 60
       - key: FACE_MATCH_THRESHOLD
         value: 0.48
       - key: FACE_MATCH_MARGIN

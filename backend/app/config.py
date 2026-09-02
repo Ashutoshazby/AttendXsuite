@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     hf_face_api_url: str = ""
     hf_face_api_token: str = "replace_with_secret_token"
     hf_face_model: str = "buffalo_s"
-    hf_timeout_seconds: int = 20
+    hf_timeout_seconds: int = 60
     face_match_threshold: float = 0.48
     face_match_margin: float = 0.06
     face_scan_frame_count: int = 5
