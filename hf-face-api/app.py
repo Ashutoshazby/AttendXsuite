@@ -1,6 +1,8 @@
 import os
 from typing import Any
 
+os.environ.setdefault("GRADIO_SSR_MODE", "False")
+
 import gradio as gr
 
 from face_core import FaceApiError, embed_base64, match_base64, require_api_token
@@ -61,4 +63,9 @@ with gr.Blocks(title="AttendXsuite Face API") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", "7860")))
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.getenv("PORT", "7860")),
+        ssr_mode=False,
+        pwa=False,
+    )
