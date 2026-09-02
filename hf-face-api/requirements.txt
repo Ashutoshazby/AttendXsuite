@@ -1,4 +1,5 @@
 fastapi==0.115.6
+gradio==5.12.0
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 pydantic-settings==2.7.1

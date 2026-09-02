@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "AttendXsuite"
     environment: str = "development"
-    port: int = 8060
+    port: int = 8070
     mongodb_uri: str = "mongodb://127.0.0.1:27017/attendxsuite"
     jwt_secret: str = "attendxsuite_local_secret"
     jwt_expire_minutes: int = 43200

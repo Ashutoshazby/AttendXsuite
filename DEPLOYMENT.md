@@ -3,7 +3,7 @@
 This guide deploys AttendXsuite in four pieces:
 
 ```text
-Hugging Face Space  -> face embedding API
+Hugging Face Gradio Space -> face embedding API
 MongoDB Atlas       -> production database
 Render              -> main FastAPI backend
 Vercel              -> admin dashboard and phone PWA
@@ -12,7 +12,7 @@ Vercel              -> admin dashboard and phone PWA
 ## 1. Hugging Face Face API
 
 1. Create a Hugging Face Space.
-2. Choose **Docker** as the Space SDK.
+2. Choose **Gradio** as the Space SDK.
 3. Name it something like:
 
 ```text
@@ -33,13 +33,15 @@ HF_TOKEN=<your-hugging-face-write-token>
 HF_SPACE_ID=<your-hf-username>/attendxsuite-face-api
 ```
 
-6. Open GitHub Actions and run **Deploy HF Face API**, or push to `main`.
+6. Open GitHub Actions and run **Deploy HF Gradio Face API**, or push to `main`.
 
-The deployed health URL will look like:
+The deployed Space URL will look like:
 
 ```text
-https://<your-hf-username>-attendxsuite-face-api.hf.space/health
+https://<your-hf-username>-attendxsuite-face-api.hf.space
 ```
+
+The backend calls its named Gradio API endpoint `/embed` through `gradio_client`.
 
 ## 2. MongoDB Atlas
 
@@ -152,4 +154,3 @@ Then redeploy Render.
 6. Login with user/admin.
 7. Scan face and confirm attendance.
 8. Check dashboard attendance table.
-

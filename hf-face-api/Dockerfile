@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY face_core.py .
 COPY app ./app
 
 EXPOSE 7860

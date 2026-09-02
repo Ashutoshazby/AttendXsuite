@@ -2,14 +2,13 @@
 title: AttendXsuite Face API
 colorFrom: blue
 colorTo: green
-sdk: docker
-app_port: 7860
+sdk: gradio
 pinned: false
 ---
 
 # AttendXsuite Hugging Face Face API
 
-Standalone Face API for Hugging Face Docker Spaces.
+Standalone Face API for Hugging Face Gradio Spaces.
 
 ## Endpoints
 
@@ -17,10 +16,16 @@ Standalone Face API for Hugging Face Docker Spaces.
 - `POST /embed`
 - `POST /match`
 
+For free Hugging Face Spaces, create a **Gradio** Space and use the named API endpoints:
+
+- `/health`
+- `/embed`
+- `/match`
+
 `/embed` and `/match` require:
 
 ```text
-Authorization: Bearer <HF_FACE_API_TOKEN>
+api_token=<HF_FACE_API_TOKEN>
 ```
 
 ## Environment

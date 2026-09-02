@@ -1,8 +1,10 @@
 import base64
+import asyncio
 import cv2
 import httpx
 import numpy as np
 from fastapi import HTTPException
+from gradio_client import Client
 from ..config import get_settings
 
 
@@ -54,6 +56,7 @@ async def create_embedding(image_base64: str) -> dict:
     if settings.face_engine == "huggingface":
         if not settings.hf_face_api_url:
             raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
+        fastapi_error = None
         try:
             async with httpx.AsyncClient(timeout=settings.hf_timeout_seconds) as client:
                 response = await client.post(
@@ -64,11 +67,31 @@ async def create_embedding(image_base64: str) -> dict:
             if response.status_code >= 500:
                 raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
             if response.status_code >= 400:
-                raise HTTPException(status_code=response.status_code, detail=response.json().get("detail", "Face could not be processed"))
-            return response.json()["data"]
-        except httpx.HTTPError:
+                fastapi_error = HTTPException(status_code=response.status_code, detail=response.json().get("detail", "Face could not be processed"))
+            else:
+                return response.json()["data"]
+        except httpx.HTTPError as error:
+            fastapi_error = error
+        try:
+            return await _gradio_embedding(image_base64, settings)
+        except Exception:
+            if isinstance(fastapi_error, HTTPException):
+                raise fastapi_error
             raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
     return _opencv_embedding(image_base64)
+
+
+async def _gradio_embedding(image_base64: str, settings) -> dict:
+    def call():
+        client = Client(settings.hf_face_api_url, verbose=False)
+        result = client.predict(image_base64, settings.hf_face_api_token, settings.hf_face_model, api_name="/embed")
+        if not isinstance(result, dict) or not result.get("success"):
+            detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else "Face could not be processed"
+            status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
+            raise HTTPException(status_code=status_code, detail=detail)
+        return result["data"]
+
+    return await asyncio.to_thread(call)
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:

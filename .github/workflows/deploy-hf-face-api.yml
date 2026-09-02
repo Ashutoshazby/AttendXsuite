@@ -1,4 +1,4 @@
-name: Deploy HF Face API
+name: Deploy HF Gradio Face API
 
 on:
   push:

@@ -8,7 +8,7 @@ AttendXsuite is a separate advanced/hybrid attendance system based on Attendify 
 frontend/      Admin dashboard, face registration, and dashboard attendance scanner
 pwa-kiosk/     Mobile-first browser PWA scanner, currently on hold
 backend/       FastAPI, MongoDB, auth, RBAC, employee, attendance, reports
-hf-face-api/   Separate Hugging Face Docker Space face embedding API
+hf-face-api/   Separate Hugging Face Gradio Space face embedding API
 scripts/       Local start, stop, tunnel, and smoke-check scripts
 ```
 
@@ -87,5 +87,5 @@ npm run check
 - Deploy `backend/` as FastAPI service.
 - Deploy `frontend/` as a static Vite site.
 - Deploy `pwa-kiosk/` later if the PWA scanner is enabled again.
-- Deploy `hf-face-api/` as a Hugging Face Docker Space.
+- Deploy `hf-face-api/` as a Hugging Face Gradio Space.
 - Put secrets only in backend/HF environment variables, never frontend.

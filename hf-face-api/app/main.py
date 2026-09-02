@@ -1,12 +1,12 @@
-import base64
 import os
-from functools import lru_cache
 from typing import Any
 
 import cv2
 import numpy as np
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
+
+from face_core import FaceApiError, cosine, decode_base64_image, embed_image
 
 app = FastAPI(title="AttendXsuite HF Face API")
 
@@ -29,66 +29,6 @@ def require_token(authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=401, detail="Invalid face API token")
 
 
-def decode_base64_image(image_base64: str) -> np.ndarray:
-    clean = image_base64.split(",", 1)[-1]
-    image_bytes = base64.b64decode(clean)
-    image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
-    if image is None:
-        raise HTTPException(status_code=422, detail="Invalid image")
-    return image
-
-
-@lru_cache
-def get_face_app(model_name: str):
-    try:
-        from insightface.app import FaceAnalysis
-        face_app = FaceAnalysis(name=model_name, providers=["CPUExecutionProvider"])
-        face_app.prepare(ctx_id=-1, det_size=(320, 320))
-        return face_app
-    except Exception as error:
-        print(f"[AttendXsuite HF] InsightFace unavailable: {error}")
-        return None
-
-
-def fallback_embedding(image: np.ndarray) -> list[float]:
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    small = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
-    vector = small.flatten()
-    norm = np.linalg.norm(vector) or 1.0
-    return (vector / norm).tolist()
-
-
-def embed_image(image: np.ndarray, model_name: str) -> dict:
-    face_app = get_face_app(model_name)
-    if face_app:
-        faces = face_app.get(image)
-        if len(faces) != 1:
-            raise HTTPException(status_code=422, detail="Exactly one clear face is required")
-        face = faces[0]
-        embedding = np.array(face.embedding, dtype=np.float32)
-        embedding = embedding / (np.linalg.norm(embedding) or 1.0)
-        box = [int(value) for value in face.bbox.tolist()]
-        return {
-            "embedding": embedding.tolist(),
-            "face_box": box,
-            "quality": {"det_score": float(face.det_score), "usable": True},
-            "model": model_name
-        }
-
-    return {
-        "embedding": fallback_embedding(image),
-        "face_box": [0, 0, int(image.shape[1]), int(image.shape[0])],
-        "quality": {"fallback": "opencv", "usable": True},
-        "model": "opencv-fallback"
-    }
-
-
-def cosine(left: list[float], right: list[float]) -> float:
-    a = np.array(left, dtype=np.float32)
-    b = np.array(right, dtype=np.float32)
-    return float(np.dot(a, b) / ((np.linalg.norm(a) * np.linalg.norm(b)) or 1.0))
-
-
 @app.get("/health")
 def health():
     return {"success": True, "message": "AttendXsuite HF face API running"}
@@ -106,7 +46,10 @@ async def embed(payload: EmbedPayload | None = None, image: UploadFile | None = 
         raise HTTPException(status_code=422, detail="Image is required")
     if frame is None:
         raise HTTPException(status_code=422, detail="Invalid image")
-    return {"success": True, "data": embed_image(frame, model_name)}
+    try:
+        return {"success": True, "data": embed_image(frame, model_name)}
+    except FaceApiError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail)
 
 
 @app.post("/match", dependencies=[Depends(require_token)])
