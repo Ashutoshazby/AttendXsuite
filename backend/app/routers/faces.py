@@ -13,6 +13,7 @@ class FaceRegisterPayload(BaseModel):
     employee_id: str
     image_base64: str | None = None
     images_base64: list[str] | None = None
+    replace_existing: bool = False
 
 
 @router.post("/register")
@@ -41,10 +42,17 @@ async def register_face(payload: FaceRegisterPayload, user=Depends(require_role(
             "created_at": now_utc()
         })
     embeddings = [face["face"]["embedding"] for face in faces]
-    await get_db().employees.update_one(
-        {"_id": employee["_id"]},
-        {"$set": {"face_embedding": embeddings[-1], "face_registered_at": now_utc(), "updated_at": now_utc()}, "$push": {"face_embeddings": {"$each": embeddings, "$slice": -5}, "face_samples": {"$each": samples, "$slice": -5}}}
-    )
+    updates = {"face_embedding": embeddings[-1], "face_registered_at": now_utc(), "updated_at": now_utc()}
+    if payload.replace_existing:
+        await get_db().employees.update_one(
+            {"_id": employee["_id"]},
+            {"$set": {**updates, "face_embeddings": embeddings[-5:], "face_samples": samples[-5:]}}
+        )
+    else:
+        await get_db().employees.update_one(
+            {"_id": employee["_id"]},
+            {"$set": updates, "$push": {"face_embeddings": {"$each": embeddings, "$slice": -5}, "face_samples": {"$each": samples, "$slice": -5}}}
+        )
     return {"success": True, "message": "Face registered", "data": {"employee_id": payload.employee_id, "registered_faces": len(samples), "model": faces[-1]["face"].get("model")}}
 
 

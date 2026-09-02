@@ -22,6 +22,12 @@ def local_date_key(value: datetime | None = None, tz: str = "Asia/Kolkata") -> s
     return local.strftime("%Y-%m-%d")
 
 
+def local_time_label(value: datetime | None, tz: str = "Asia/Kolkata") -> str | None:
+    if not value:
+        return None
+    return value.astimezone(ZoneInfo(tz)).strftime("%I:%M:%S %p")
+
+
 def day_range_utc(date_key: str | None = None, tz: str = "Asia/Kolkata") -> tuple[datetime, datetime]:
     zone = ZoneInfo(tz)
     if date_key:

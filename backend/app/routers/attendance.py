@@ -10,7 +10,7 @@ from ..database import get_db
 from ..dependencies import current_user, require_role
 from ..services.face_engine import best_match, create_embeddings
 from ..services.realtime import publish, subscribe, sse
-from ..utils.timezone import day_range_utc, local_date_key, now_utc
+from ..utils.timezone import day_range_utc, local_date_key, local_time_label, now_utc
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 PUNCH_GAP_SECONDS = 60
@@ -123,7 +123,19 @@ async def today(user=Depends(require_role("admin", "user"))):
     for record in records:
         grouped.setdefault(record["employee_id"], []).append(record)
     for employee_id, items in grouped.items():
-        rows.append({"employee_id": employee_id, "employee_name": names.get(employee_id, employee_id), "date": local_date_key(items[0]["timestamp"], timezone), "login": next((i["timestamp"] for i in items if i["type"] == "login"), None), "logout": next((i["timestamp"] for i in reversed(items) if i["type"] == "logout"), None), "status": "In Progress" if items[-1]["type"] == "login" else "Completed"})
+        login_at = next((i["timestamp"] for i in items if i["type"] == "login"), None)
+        logout_at = next((i["timestamp"] for i in reversed(items) if i["type"] == "logout"), None)
+        rows.append({
+            "employee_id": employee_id,
+            "employee_name": names.get(employee_id, employee_id),
+            "date": local_date_key(items[0]["timestamp"], timezone),
+            "login": login_at,
+            "logout": logout_at,
+            "login_time": local_time_label(login_at, timezone),
+            "logout_time": local_time_label(logout_at, timezone),
+            "timezone": timezone,
+            "status": "In Progress" if items[-1]["type"] == "login" else "Completed"
+        })
     return {"success": True, "data": rows}
 
 

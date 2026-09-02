@@ -85,6 +85,7 @@ function App() {
   const [summary, setSummary] = useState(null);
   const [selected, setSelected] = useState("");
   const [faceCaptures, setFaceCaptures] = useState([]);
+  const [faceSaveMode, setFaceSaveMode] = useState("append");
   const [faceCameraReady, setFaceCameraReady] = useState(false);
   const [attendanceCandidate, setAttendanceCandidate] = useState(null);
   const [attendanceCameraReady, setAttendanceCameraReady] = useState(false);
@@ -205,10 +206,10 @@ function App() {
       if (!faceCaptures.length) throw new Error("Capture at least one face sample.");
       const response = await api("/faces/register", {
         method: "POST",
-        body: JSON.stringify({ employee_id: selected, images_base64: faceCaptures })
+        body: JSON.stringify({ employee_id: selected, images_base64: faceCaptures, replace_existing: faceSaveMode === "replace" })
       });
       setFaceCaptures([]);
-      setMessage(`${response.data.registered_faces || 1} face sample(s) saved. Duplicate checks passed.`);
+      setMessage(`${response.data.registered_faces || 1} face sample(s) ${faceSaveMode === "replace" ? "updated" : "saved"}.`);
       await refresh();
     } catch (error) {
       setMessage(error.message);
@@ -409,7 +410,10 @@ function App() {
           <>
             <section className="hero-panel">
               <div><span className="eyebrow">Live attendance control</span><h2>Register five face samples, manage hospital shifts, and track attendance in realtime.</h2></div>
-              <button type="button" onClick={() => openPage("face-registration")}><Camera size={18} /> Register Face</button>
+              <div className="hero-actions">
+                <button type="button" onClick={() => openPage("kiosk")}><Clock3 size={18} /> Scan Attendance</button>
+                <button type="button" onClick={() => openPage("face-registration")}><Camera size={18} /> Register Face</button>
+              </div>
             </section>
             <section className="stats">
               <article><Users size={20} /><span>Total Employees</span><strong>{stats.total_employees ?? stats.totalEmployees}</strong></article>
@@ -436,11 +440,15 @@ function App() {
                 <option value="">Select employee</option>
                 {employees.filter((item) => item.active !== false).map((item) => <option key={item.employee_id} value={item.employee_id}>{item.name} ({item.employee_id})</option>)}
               </select>
+              <div className="segmented">
+                <button type="button" className={faceSaveMode === "append" ? "active" : ""} onClick={() => setFaceSaveMode("append")}>Add Samples</button>
+                <button type="button" className={faceSaveMode === "replace" ? "active" : ""} onClick={() => setFaceSaveMode("replace")}>Improve Face</button>
+              </div>
               <video ref={faceVideoRef} className="video mirrored" muted playsInline />
               <div className="row">
                 <button type="button" onClick={startFaceCamera}>Start Camera</button>
                 <button type="button" onClick={captureFace} disabled={!faceCameraReady || faceCaptures.length >= MAX_FACE_SAMPLES}>Capture</button>
-                <button type="button" onClick={saveFaces} disabled={busy || !selected || !faceCaptures.length}><Save size={18} /> Save Faces</button>
+                <button type="button" onClick={saveFaces} disabled={busy || !selected || !faceCaptures.length}><Save size={18} /> {faceSaveMode === "replace" ? "Update Faces" : "Save Faces"}</button>
               </div>
               <div className="face-samples">
                 {faceCaptures.map((image, index) => (
@@ -574,14 +582,14 @@ function App() {
 
         {page === "attendance" && (
           <section className="panel">
-            <div className="section-head"><h2><RefreshCw size={20} /> Attendance Records</h2><span>IST timezone</span></div>
+            <div className="section-head"><h2><RefreshCw size={20} /> Attendance Records</h2><span>Calcutta time</span></div>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>Employee</th><th>Date</th><th>Check In</th><th>Check Out</th><th>Status</th></tr></thead>
                 <tbody>{attendance.map((row) => {
                   const loginAt = row.login || row.check_in;
                   const logoutAt = row.logout || row.check_out;
-                  return <tr key={`${row.employee_id}-${row.date}`}><td>{row.employee_name}<small>{row.employee_id}</small></td><td>{row.date}</td><td>{loginAt ? new Date(loginAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) : "-"}</td><td>{logoutAt ? new Date(logoutAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) : "-"}</td><td><span className="pill">{row.status}</span></td></tr>;
+                  return <tr key={`${row.employee_id}-${row.date}`}><td>{row.employee_name}<small>{row.employee_id}</small></td><td>{row.date}</td><td>{row.login_time || (loginAt ? new Date(loginAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) : "-")}</td><td>{row.logout_time || (logoutAt ? new Date(logoutAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) : "-")}</td><td><span className="pill">{row.status}</span></td></tr>;
                 })}</tbody>
               </table>
             </div>

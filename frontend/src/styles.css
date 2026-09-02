@@ -148,6 +148,12 @@ nav button.active, nav button:hover { background: #16233a; color: white; }
 .hero-panel .eyebrow { color: #ccfbf1; }
 .hero-panel h2 { max-width: 760px; margin-top: 8px; font-size: 26px; line-height: 1.2; }
 .hero-panel button { background: white; color: #0f766e; }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
 
 .stats {
   display: grid;
@@ -228,6 +234,26 @@ nav button.active, nav button:hover { background: #16233a; color: white; }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.segmented button {
+  min-height: 38px;
+  padding: 0 10px;
+  background: transparent;
+  color: #475569;
+  border: 0;
+}
+.segmented button.active {
+  background: #2563eb;
+  color: white;
 }
 label {
   display: grid;
@@ -362,7 +388,7 @@ th { color: #475569; font-size: 12px; text-transform: uppercase; }
   .brand strong { font-size: 16px; }
   .brand span { display: none; }
   .topbar, .hero-panel { align-items: flex-start; grid-template-columns: 1fr; flex-direction: column; }
-  .topbar .row, .hero-panel button, .scan-actions button { width: 100%; }
+  .topbar .row, .hero-actions, .hero-actions button, .scan-actions button { width: 100%; }
   .attendance-scan { grid-template-columns: 1fr; }
   .stats, .admin-grid, .users-grid, .face-grid, .employees-page, .form-grid, .access-row { grid-template-columns: 1fr; }
   .face-grid > .panel:nth-child(2), .employees-page > .panel:nth-child(2) { grid-column: auto; }
