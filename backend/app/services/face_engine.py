@@ -1,10 +1,9 @@
 import base64
-import asyncio
+import json
 import cv2
 import httpx
 import numpy as np
 from fastapi import HTTPException
-from gradio_client import Client
 from ..config import get_settings
 
 
@@ -101,29 +100,59 @@ async def create_embeddings(frames: list[str]) -> list[dict]:
 
 
 async def _gradio_embedding(image_base64: str, settings) -> dict:
-    def call():
-        client = Client(settings.hf_face_api_url, verbose=False)
-        result = client.predict(image_base64, settings.hf_face_api_token, settings.hf_face_model, api_name="/embed")
-        if not isinstance(result, dict) or not result.get("success"):
-            detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else "Face could not be processed"
-            status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
-            raise HTTPException(status_code=status_code, detail=detail)
-        return result["data"]
-
-    return await asyncio.to_thread(call)
+    result = await _gradio_call("embed", {
+        "image_base64": image_base64,
+        "api_token": settings.hf_face_api_token,
+        "model": settings.hf_face_model,
+    }, settings)
+    if not isinstance(result, dict) or not result.get("success"):
+        detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else "Face could not be processed"
+        status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
+        raise HTTPException(status_code=status_code, detail=detail)
+    return result["data"]
 
 
 async def _gradio_embeddings(frames: list[str], settings) -> list[dict]:
-    def call():
-        client = Client(settings.hf_face_api_url, verbose=False)
-        result = client.predict(frames, settings.hf_face_api_token, settings.hf_face_model, api_name="/embed_many")
-        if not isinstance(result, dict) or not result.get("success"):
-            detail = result.get("detail", "Faces could not be processed") if isinstance(result, dict) else "Faces could not be processed"
-            status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
-            raise HTTPException(status_code=status_code, detail=detail)
-        return result["data"]
+    result = await _gradio_call("embed_many", {
+        "frames": frames,
+        "api_token": settings.hf_face_api_token,
+        "model": settings.hf_face_model,
+    }, settings)
+    if not isinstance(result, dict) or not result.get("success"):
+        detail = result.get("detail", "Faces could not be processed") if isinstance(result, dict) else "Faces could not be processed"
+        status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
+        raise HTTPException(status_code=status_code, detail=detail)
+    return result["data"]
 
-    return await asyncio.to_thread(call)
+
+async def _gradio_call(endpoint: str, payload: dict, settings):
+    base_url = settings.hf_face_api_url.rstrip("/")
+    timeout = httpx.Timeout(settings.hf_timeout_seconds, connect=15)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(f"{base_url}/gradio_api/call/v2/{endpoint}", json=payload)
+        if response.status_code == 404:
+            response = await client.post(f"{base_url}/gradio_api/call/{endpoint}", json={"data": list(payload.values())})
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail=_response_detail(response, "Face service endpoint not found"))
+        event_id = response.json().get("event_id")
+        if not event_id:
+            raise HTTPException(status_code=503, detail="Face service did not start the request")
+        result = await client.get(f"{base_url}/gradio_api/call/{endpoint}/{event_id}")
+        if result.status_code >= 400:
+            raise HTTPException(status_code=result.status_code, detail=_response_detail(result, "Face service result not found"))
+    for line in result.text.splitlines():
+        if line.startswith("data: "):
+            data = json.loads(line.removeprefix("data: "))
+            return data[0] if isinstance(data, list) and data else data
+    raise HTTPException(status_code=503, detail="Face service returned no result")
+
+
+def _response_detail(response, fallback: str) -> str:
+    try:
+        body = response.json()
+        return body.get("detail") or body.get("error") or fallback
+    except Exception:
+        return fallback
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:
