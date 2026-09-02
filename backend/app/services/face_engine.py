@@ -106,7 +106,7 @@ async def _gradio_embedding(image_base64: str, settings) -> dict:
         "model": settings.hf_face_model,
     }, settings)
     if not isinstance(result, dict) or not result.get("success"):
-        detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else "Face could not be processed"
+        detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else f"Face could not be processed: {result}"
         status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
         raise HTTPException(status_code=status_code, detail=detail)
     return result["data"]
@@ -119,7 +119,7 @@ async def _gradio_embeddings(frames: list[str], settings) -> list[dict]:
         "model": settings.hf_face_model,
     }, settings)
     if not isinstance(result, dict) or not result.get("success"):
-        detail = result.get("detail", "Faces could not be processed") if isinstance(result, dict) else "Faces could not be processed"
+        detail = result.get("detail", "Faces could not be processed") if isinstance(result, dict) else f"Faces could not be processed: {result}"
         status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
         raise HTTPException(status_code=status_code, detail=detail)
     return result["data"]
@@ -141,8 +141,15 @@ async def _gradio_call(endpoint: str, payload: dict, settings):
         if result.status_code >= 400:
             raise HTTPException(status_code=result.status_code, detail=_response_detail(result, "Face service result not found"))
     for line in result.text.splitlines():
+        if line.startswith("event: error"):
+            raise HTTPException(status_code=503, detail="Face service failed while processing the photo")
         if line.startswith("data: "):
             data = json.loads(line.removeprefix("data: "))
+            if isinstance(data, list) and data and isinstance(data[0], str):
+                try:
+                    data[0] = json.loads(data[0])
+                except json.JSONDecodeError:
+                    pass
             return data[0] if isinstance(data, list) and data else data
     raise HTTPException(status_code=503, detail="Face service returned no result")
 
