@@ -52,23 +52,30 @@ def _opencv_embedding(image_base64: str) -> dict:
     }
 
 
+def _fallback_embedding(image_base64: str, reason: str | None = None) -> dict:
+    face = _opencv_embedding(image_base64)
+    if reason:
+        face["quality"] = {**face.get("quality", {}), "fallback_reason": reason[:240]}
+    return face
+
+
 async def create_embedding(image_base64: str) -> dict:
     settings = get_settings()
     if settings.face_engine == "huggingface":
         if not settings.hf_face_api_url:
-            raise HTTPException(status_code=503, detail="Face service is waking up, please scan again in a few seconds.")
+            return _fallback_embedding(image_base64, "Hugging Face URL is not configured")
         try:
             return await _gradio_embedding(image_base64, settings)
-        except HTTPException:
-            raise
+        except HTTPException as error:
+            return _fallback_embedding(image_base64, str(error.detail))
         except Exception as gradio_error:
             fastapi_error = gradio_error
         try:
             return await _fastapi_embedding(image_base64, settings)
-        except HTTPException:
-            raise
+        except HTTPException as error:
+            return _fallback_embedding(image_base64, str(error.detail))
         except Exception:
-            raise HTTPException(status_code=503, detail=f"Face service is not ready: {fastapi_error}")
+            return _fallback_embedding(image_base64, f"Face service is not ready: {fastapi_error}")
     return _opencv_embedding(image_base64)
 
 
@@ -96,7 +103,7 @@ async def create_embeddings(frames: list[str]) -> list[dict]:
     try:
         return await _gradio_embeddings(frames, settings)
     except Exception:
-        return [await create_embedding(frame) for frame in frames]
+        return [_fallback_embedding(frame, "Batch face service failed") for frame in frames]
 
 
 async def _gradio_embedding(image_base64: str, settings) -> dict:
