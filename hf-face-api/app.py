@@ -5,7 +5,7 @@ os.environ.setdefault("GRADIO_SSR_MODE", "False")
 
 import gradio as gr
 
-from face_core import FaceApiError, embed_base64, match_base64, require_api_token
+from face_core import FaceApiError, embed_base64, embed_many_base64, match_base64, require_api_token
 
 try:
     import spaces
@@ -23,6 +23,11 @@ def gpu_task(duration: int = 60):
     return decorator
 
 
+def scan_duration(frames: list[str], *_args) -> int:
+    frame_count = max(1, min(len(frames or []), 5))
+    return 8 + (frame_count * 4)
+
+
 def health() -> dict:
     return {"success": True, "message": "AttendXsuite Gradio face API running"}
 
@@ -36,7 +41,16 @@ def embed(image_base64: str, api_token: str, model: str | None = None) -> dict:
         return {"success": False, "detail": error.detail, "status_code": error.status_code}
 
 
-@gpu_task(duration=60)
+@gpu_task(duration=scan_duration)
+def embed_many(frames: list[str], api_token: str, model: str | None = None) -> dict:
+    try:
+        require_api_token(api_token)
+        return {"success": True, "data": embed_many_base64((frames or [])[:5], model)}
+    except FaceApiError as error:
+        return {"success": False, "detail": error.detail, "status_code": error.status_code}
+
+
+@gpu_task(duration=30)
 def match(image_base64: str, employees: list[dict[str, Any]], api_token: str, threshold: float = 0.48, margin: float = 0.06) -> dict:
     try:
         require_api_token(api_token)
@@ -76,6 +90,18 @@ with gr.Blocks(title="AttendXsuite Face API") as demo:
             inputs=[match_image_input, match_employees_input, match_token_input, match_threshold_input, match_margin_input],
             outputs=match_output,
             api_name="match",
+        )
+
+    with gr.Accordion("Batch Embed API", open=False):
+        batch_frames_input = gr.JSON(label="Frames")
+        batch_token_input = gr.Textbox(label="API token", type="password")
+        batch_model_input = gr.Textbox(label="Model", value=os.getenv("HF_FACE_MODEL", "buffalo_s"))
+        batch_output = gr.JSON(label="Embeddings")
+        gr.Button("Embed Frames").click(
+            fn=embed_many,
+            inputs=[batch_frames_input, batch_token_input, batch_model_input],
+            outputs=batch_output,
+            api_name="embed_many",
         )
 
 

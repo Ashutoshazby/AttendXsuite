@@ -81,12 +81,35 @@ async def create_embedding(image_base64: str) -> dict:
     return _opencv_embedding(image_base64)
 
 
+async def create_embeddings(frames: list[str]) -> list[dict]:
+    settings = get_settings()
+    if settings.face_engine != "huggingface":
+        return [_opencv_embedding(frame) for frame in frames]
+    try:
+        return await _gradio_embeddings(frames, settings)
+    except Exception:
+        return [await create_embedding(frame) for frame in frames]
+
+
 async def _gradio_embedding(image_base64: str, settings) -> dict:
     def call():
         client = Client(settings.hf_face_api_url, verbose=False)
         result = client.predict(image_base64, settings.hf_face_api_token, settings.hf_face_model, api_name="/embed")
         if not isinstance(result, dict) or not result.get("success"):
             detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else "Face could not be processed"
+            status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
+            raise HTTPException(status_code=status_code, detail=detail)
+        return result["data"]
+
+    return await asyncio.to_thread(call)
+
+
+async def _gradio_embeddings(frames: list[str], settings) -> list[dict]:
+    def call():
+        client = Client(settings.hf_face_api_url, verbose=False)
+        result = client.predict(frames, settings.hf_face_api_token, settings.hf_face_model, api_name="/embed_many")
+        if not isinstance(result, dict) or not result.get("success"):
+            detail = result.get("detail", "Faces could not be processed") if isinstance(result, dict) else "Faces could not be processed"
             status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
             raise HTTPException(status_code=status_code, detail=detail)
         return result["data"]

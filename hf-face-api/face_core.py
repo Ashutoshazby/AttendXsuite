@@ -79,6 +79,10 @@ def embed_base64(image_base64: str, model_name: str | None = None) -> dict:
     return embed_image(decode_base64_image(image_base64), model_name or os.getenv("HF_FACE_MODEL", "buffalo_s"))
 
 
+def embed_many_base64(frames: list[str], model_name: str | None = None) -> list[dict]:
+    return [embed_base64(frame, model_name) for frame in frames]
+
+
 def cosine(left: list[float], right: list[float]) -> float:
     a = np.array(left, dtype=np.float32)
     b = np.array(right, dtype=np.float32)

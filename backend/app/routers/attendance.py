@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from ..config import get_settings
 from ..database import get_db
 from ..dependencies import current_user, require_role
-from ..services.face_engine import best_match, create_embedding
+from ..services.face_engine import best_match, create_embeddings
 from ..services.realtime import publish, subscribe, sse
 from ..utils.timezone import day_range_utc, local_date_key, now_utc
 
@@ -54,8 +54,8 @@ async def scan(payload: ScanPayload, user=Depends(require_role("admin", "user"))
         raise HTTPException(status_code=422, detail="No scan frames received")
     employees = await get_db().employees.find({"company_id": user["company_id"], "active": True, "face_embeddings": {"$exists": True}}).to_list(100)
     votes = []
-    for frame in frames:
-        face = await create_embedding(frame)
+    faces = await create_embeddings(frames)
+    for face in faces:
         match = best_match(face["embedding"], employees)
         votes.append(match["employee"]["employee_id"])
     winner, count = Counter(votes).most_common(1)[0]
