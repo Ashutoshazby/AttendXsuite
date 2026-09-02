@@ -56,12 +56,25 @@ async def scan(payload: ScanPayload, user=Depends(require_role("admin", "user"))
         raise HTTPException(status_code=422, detail="No scan frames received")
     employees = await get_db().employees.find({"company_id": user["company_id"], "active": True, "face_embeddings": {"$exists": True}}).to_list(100)
     votes = []
+    scores = []
+    errors = []
     faces = await create_embeddings(frames)
     for face in faces:
-        match = best_match(face["embedding"], employees)
-        votes.append(match["employee"]["employee_id"])
+        try:
+            match = best_match(face["embedding"], employees)
+            votes.append(match["employee"]["employee_id"])
+            scores.append({"employee_id": match["employee"]["employee_id"], "score": match["score"]})
+        except HTTPException as error:
+            errors.append(str(error.detail))
+    if not votes:
+        raise HTTPException(status_code=422, detail=errors[-1] if errors else "Face match is uncertain. Please scan again.")
     winner, count = Counter(votes).most_common(1)[0]
-    if count < settings.face_scan_consensus:
+    second_count = Counter(votes).most_common(2)[1][1] if len(Counter(votes)) > 1 else 0
+    winner_scores = [item["score"] for item in scores if item["employee_id"] == winner]
+    average_score = sum(winner_scores) / len(winner_scores)
+    if count == second_count:
+        raise HTTPException(status_code=422, detail="Face match is uncertain. Please scan again.")
+    if count < settings.face_scan_consensus and (count < 2 or average_score < settings.face_match_threshold + 0.08):
         raise HTTPException(status_code=422, detail="Face match is uncertain. Please scan again.")
     employee = await get_db().employees.find_one({"company_id": user["company_id"], "employee_id": winner})
     action = await attendance_type(user["company_id"], winner, now_utc())

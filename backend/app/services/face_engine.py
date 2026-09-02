@@ -40,16 +40,42 @@ def crop_face_base64(image_base64: str, face_box: list[int] | None) -> str:
 def _opencv_embedding(image_base64: str) -> dict:
     image = _decode_image(image_base64)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    face = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
+    face_box = _detect_opencv_face(gray)
+    x, y, width, height = face_box
+    face_region = gray[y:y + height, x:x + width]
+    if face_region.size == 0:
+        face_region = gray
+        face_box = [0, 0, int(image.shape[1]), int(image.shape[0])]
+    face = cv2.resize(face_region, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
+    face = cv2.equalizeHist((face * 255).astype(np.uint8)).astype(np.float32) / 255.0
     vector = face.flatten()
     norm = np.linalg.norm(vector) or 1.0
     embedding = (vector / norm).tolist()
     return {
         "embedding": embedding,
-        "face_box": [0, 0, int(image.shape[1]), int(image.shape[0])],
+        "face_box": face_box,
         "quality": {"engine": "opencv-fallback", "usable": True},
         "model": "opencv-fallback"
     }
+
+
+def _detect_opencv_face(gray: np.ndarray) -> list[int]:
+    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    detector = cv2.CascadeClassifier(cascade_path)
+    faces = detector.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=4, minSize=(64, 64))
+    if len(faces):
+        x, y, width, height = max(faces, key=lambda item: item[2] * item[3])
+    else:
+        side = int(min(gray.shape[:2]) * 0.72)
+        x = max(0, (gray.shape[1] - side) // 2)
+        y = max(0, (gray.shape[0] - side) // 2)
+        width = height = side
+    pad = int(max(width, height) * 0.16)
+    x1 = max(0, int(x) - pad)
+    y1 = max(0, int(y) - pad)
+    x2 = min(gray.shape[1], int(x + width) + pad)
+    y2 = min(gray.shape[0], int(y + height) + pad)
+    return [x1, y1, x2 - x1, y2 - y1]
 
 
 def _fallback_embedding(image_base64: str, reason: str | None = None) -> dict:
