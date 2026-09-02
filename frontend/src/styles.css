@@ -122,6 +122,7 @@ nav button.active, nav button:hover { background: #16233a; color: white; }
   align-content: start;
   gap: 18px;
   padding: 24px;
+  min-width: 0;
 }
 .topbar, .section-head {
   display: flex;
@@ -209,8 +210,8 @@ nav button.active, nav button:hover { background: #16233a; color: white; }
 
 .grid { display: grid; gap: 18px; }
 .admin-grid { grid-template-columns: .8fr 1fr 1.2fr; align-items: start; }
-.face-grid { grid-template-columns: minmax(240px, .75fr) minmax(320px, 1.25fr) minmax(260px, .9fr); align-items: start; }
-.employees-page { grid-template-columns: minmax(260px, .7fr) minmax(460px, 1.3fr); align-items: start; }
+.face-grid { grid-template-columns: minmax(220px, .75fr) minmax(300px, 1.25fr) minmax(240px, .9fr); align-items: start; }
+.employees-page { grid-template-columns: minmax(240px, .65fr) minmax(360px, 1.35fr); align-items: start; }
 .users-grid { grid-template-columns: .8fr 1.4fr; align-items: start; }
 .panel { display: grid; gap: 14px; padding: 18px; }
 .face-panel { min-width: 0; }
@@ -279,6 +280,7 @@ label {
   border: 1px solid #dbe3ee;
   padding: 12px;
   text-align: left;
+  width: 100%;
 }
 .employee-row.selected { border-color: #2563eb; background: #eff6ff; }
 .employee-row b {
@@ -286,6 +288,34 @@ label {
   color: #2563eb;
   font-size: 12px;
   white-space: nowrap;
+}
+.employee-row-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px;
+  padding: 8px;
+}
+.employee-pick {
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.employee-pick span { min-width: 0; }
+.employee-pick strong, .employee-pick small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.icon-danger {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 .access-row {
   display: grid;
@@ -322,18 +352,24 @@ th { color: #475569; font-size: 12px; text-transform: uppercase; }
 
 @media (max-width: 980px) {
   .stats, .admin-grid, .users-grid, .face-grid, .employees-page { grid-template-columns: 1fr 1fr; }
+  .face-grid > .panel:nth-child(2), .employees-page > .panel:nth-child(2) { grid-column: 1 / -1; }
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 680px) {
   .content { padding: 16px; }
   .sidebar { padding: 12px 16px; }
+  .brand strong { font-size: 16px; }
   .brand span { display: none; }
   .topbar, .hero-panel { align-items: flex-start; grid-template-columns: 1fr; flex-direction: column; }
+  .topbar .row, .hero-panel button, .scan-actions button { width: 100%; }
   .attendance-scan { grid-template-columns: 1fr; }
   .stats, .admin-grid, .users-grid, .face-grid, .employees-page, .form-grid, .access-row { grid-template-columns: 1fr; }
+  .face-grid > .panel:nth-child(2), .employees-page > .panel:nth-child(2) { grid-column: auto; }
   nav { right: 16px; }
   .face-samples { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   h1 { font-size: 28px; }
   .hero-panel h2 { font-size: 22px; }
+  .section-head { align-items: flex-start; flex-direction: column; }
+  th, td { padding: 11px 10px; white-space: nowrap; }
 }

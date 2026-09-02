@@ -170,6 +170,8 @@ def _response_detail(response, fallback: str) -> str:
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:
+    if len(left) != len(right):
+        return -1.0
     a = np.array(left, dtype=np.float32)
     b = np.array(right, dtype=np.float32)
     denom = (np.linalg.norm(a) * np.linalg.norm(b)) or 1.0

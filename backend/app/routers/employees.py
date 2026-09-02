@@ -26,12 +26,14 @@ class EmployeePayload(BaseModel):
     active: bool = True
 
 
-async def ensure_unique_face(company_id: str, employee_id: str, embedding: list[float]):
+async def ensure_unique_face(company_id: str, employee_id: str, embedding: list[float], model: str | None = None):
     if not embedding:
+        return
+    if model == "opencv-fallback":
         return
     async for employee in get_db().employees.find({"company_id": company_id, "employee_id": {"$ne": employee_id}, "face_embeddings": {"$exists": True}}):
         for known in employee.get("face_embeddings", []):
-            if cosine_similarity(embedding, known) >= 0.94:
+            if cosine_similarity(embedding, known) >= 0.985:
                 raise HTTPException(status_code=409, detail=f"Face is already registered for {employee.get('name', employee['employee_id'])}")
 
 
@@ -80,5 +82,7 @@ async def update_employee(employee_id: str, payload: EmployeePayload, user=Depen
 
 @router.delete("/{employee_id}")
 async def delete_employee(employee_id: str, user=Depends(require_role("admin"))):
-    await get_db().employees.update_one({"company_id": user["company_id"], "employee_id": employee_id}, {"$set": {"active": False, "updated_at": now_utc()}})
-    return {"success": True, "message": "Employee deactivated"}
+    result = await get_db().employees.delete_one({"company_id": user["company_id"], "employee_id": employee_id})
+    if not result.deleted_count:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return {"success": True, "message": "Employee deleted"}

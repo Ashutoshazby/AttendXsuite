@@ -30,7 +30,7 @@ async def register_face(payload: FaceRegisterPayload, user=Depends(require_role(
     if not faces:
         raise HTTPException(status_code=422, detail="No clear face found. Use bright light, keep one face centered, and capture again.")
     for face in faces:
-        await ensure_unique_face(user["company_id"], payload.employee_id, face["face"]["embedding"])
+        await ensure_unique_face(user["company_id"], payload.employee_id, face["face"]["embedding"], face["face"].get("model"))
     samples = []
     for face in faces:
         samples.append({

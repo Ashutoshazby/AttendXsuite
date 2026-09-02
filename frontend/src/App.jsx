@@ -243,6 +243,24 @@ function App() {
     }
   };
 
+  const deleteEmployee = async (employeeId) => {
+    if (!employeeId) return;
+    setBusy(true);
+    try {
+      await api(`/employees/${encodeURIComponent(employeeId)}`, { method: "DELETE" });
+      if (selected === employeeId) {
+        setSelected("");
+        setEmployeeDetails(blankEmployeeDetails);
+      }
+      setMessage("Employee deleted.");
+      await refresh();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createAppUser = async (event) => {
     event.preventDefault();
     setBusy(true);
@@ -359,8 +377,8 @@ function App() {
   }
 
   const pages = admin
-    ? [["overview", "Overview", Activity], ["face-registration", "Face Registration", Camera], ["employees", "Employees", Users], ["payroll", "Payroll", Banknote], ["users", "Users", UserPlus], ["kiosk", "Kiosk", Clock3], ["attendance", "Attendance", CalendarDays]]
-    : [["kiosk", "Kiosk", Clock3], ["attendance", "Attendance", CalendarDays]];
+    ? [["overview", "Overview", Activity], ["face-registration", "Face Registration", Camera], ["employees", "Employees", Users], ["payroll", "Payroll", Banknote], ["users", "Users", UserPlus], ["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]]
+    : [["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]];
 
   return (
     <main className="app-shell">
@@ -416,7 +434,7 @@ function App() {
               <div className="section-head"><h2><Camera size={20} /> Face Samples</h2><span>{faceCaptures.length}/5 captured</span></div>
               <select value={selected} onChange={(e) => loadEmployeeDetails(e.target.value)}>
                 <option value="">Select employee</option>
-                {employees.map((item) => <option key={item.employee_id} value={item.employee_id}>{item.name} ({item.employee_id})</option>)}
+                {employees.filter((item) => item.active !== false).map((item) => <option key={item.employee_id} value={item.employee_id}>{item.name} ({item.employee_id})</option>)}
               </select>
               <video ref={faceVideoRef} className="video mirrored" muted playsInline />
               <div className="row">
@@ -437,7 +455,7 @@ function App() {
             <section className="panel">
               <h2><Users size={20} /> Registered Employees</h2>
               <div className="employee-list">
-                {employees.map((item) => (
+                {employees.filter((item) => item.active !== false).map((item) => (
                   <button type="button" className={`employee-row ${selected === item.employee_id ? "selected" : ""}`} key={item.employee_id} onClick={() => loadEmployeeDetails(item.employee_id)}>
                     <span><strong>{item.name}</strong><small>{item.employee_id} | {item.department || "No department"}</small></span>
                     <b>{item.face_embeddings?.length || 0}/5 faces</b>
@@ -453,11 +471,14 @@ function App() {
             <section className="panel">
               <h2><Users size={20} /> Employees</h2>
               <div className="employee-list tall">
-                {employees.map((item) => (
-                  <button type="button" className={`employee-row ${selected === item.employee_id ? "selected" : ""}`} key={item.employee_id} onClick={() => loadEmployeeDetails(item.employee_id)}>
-                    <span><strong>{item.name}</strong><small>{item.employee_id} | {item.department || "No department"}</small></span>
-                    <b>{item.active === false ? "Inactive" : "Active"}</b>
-                  </button>
+                {employees.filter((item) => item.active !== false).map((item) => (
+                  <div className={`employee-row employee-row-actions ${selected === item.employee_id ? "selected" : ""}`} key={item.employee_id}>
+                    <button type="button" className="employee-pick" onClick={() => loadEmployeeDetails(item.employee_id)}>
+                      <span><strong>{item.name}</strong><small>{item.employee_id} | {item.department || "No department"}</small></span>
+                      <b>Active</b>
+                    </button>
+                    <button type="button" className="icon-danger" disabled={busy} aria-label={`Delete ${item.name}`} onClick={() => deleteEmployee(item.employee_id)}><Trash2 size={16} /></button>
+                  </div>
                 ))}
               </div>
             </section>
@@ -532,7 +553,7 @@ function App() {
 
         {page === "kiosk" && (
           <section className="panel dashboard-kiosk">
-            <div className="section-head"><h2><Camera size={20} /> Dashboard Attendance</h2><span>{attendanceCameraReady ? "Camera ready" : "Camera off"}</span></div>
+            <div className="section-head"><h2><Camera size={20} /> Attendance Scan</h2><span>{attendanceCameraReady ? "Camera ready" : "Camera off"}</span></div>
             <div className="attendance-scan">
               <video ref={attendanceVideoRef} className="video mirrored" muted playsInline />
               <div className="scan-actions">
@@ -553,7 +574,7 @@ function App() {
 
         {page === "attendance" && (
           <section className="panel">
-            <div className="section-head"><h2><RefreshCw size={20} /> Attendance Today</h2><span>IST timezone</span></div>
+            <div className="section-head"><h2><RefreshCw size={20} /> Attendance Records</h2><span>IST timezone</span></div>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>Employee</th><th>Date</th><th>Check In</th><th>Check Out</th><th>Status</th></tr></thead>
