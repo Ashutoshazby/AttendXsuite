@@ -21,12 +21,14 @@ def crop_face_base64(image_base64: str, face_box: list[int] | None) -> str:
     image = _decode_image(image_base64)
     if not face_box or len(face_box) != 4:
         return image_base64.split(",", 1)[-1]
-    x, y, w, h = [int(value) for value in face_box]
-    pad = int(max(w, h) * 0.18)
-    x1 = max(0, x - pad)
-    y1 = max(0, y - pad)
-    x2 = min(image.shape[1], x + w + pad)
-    y2 = min(image.shape[0], y + h + pad)
+    left, top, third, fourth = [int(value) for value in face_box]
+    width = third - left if third > left else third
+    height = fourth - top if fourth > top else fourth
+    pad = int(max(width, height) * 0.18)
+    x1 = max(0, left - pad)
+    y1 = max(0, top - pad)
+    x2 = min(image.shape[1], left + width + pad)
+    y2 = min(image.shape[0], top + height + pad)
     cropped = image[y1:y2, x1:x2]
     if cropped.size == 0:
         return image_base64.split(",", 1)[-1]

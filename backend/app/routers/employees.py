@@ -16,6 +16,10 @@ class EmployeePayload(BaseModel):
     phone: str | None = None
     email: EmailStr | None = None
     salary: float | None = None
+    monthly_salary: float | None = None
+    overtime_hourly_rate: float | None = None
+    working_days_per_week: int = 6
+    standard_daily_hours: float = 8
     shift_type: str = "flexible"
     shift_start: str | None = None
     shift_end: str | None = None
@@ -42,6 +46,10 @@ async def list_employees(user=Depends(require_role("admin", "user"))):
 @router.post("/create")
 async def create_employee(payload: EmployeePayload, user=Depends(require_role("admin"))):
     doc = payload.model_dump()
+    if doc.get("monthly_salary") is None and doc.get("salary") is not None:
+        doc["monthly_salary"] = doc["salary"]
+    if doc.get("salary") is None and doc.get("monthly_salary") is not None:
+        doc["salary"] = doc["monthly_salary"]
     doc.update({"company_id": user["company_id"], "face_samples": [], "face_embeddings": [], "created_at": now_utc(), "updated_at": now_utc()})
     try:
         result = await get_db().employees.insert_one(doc)
@@ -54,6 +62,10 @@ async def create_employee(payload: EmployeePayload, user=Depends(require_role("a
 @router.put("/update/{employee_id}")
 async def update_employee(employee_id: str, payload: EmployeePayload, user=Depends(require_role("admin"))):
     updates = payload.model_dump()
+    if updates.get("monthly_salary") is None and updates.get("salary") is not None:
+        updates["monthly_salary"] = updates["salary"]
+    if updates.get("salary") is None and updates.get("monthly_salary") is not None:
+        updates["salary"] = updates["monthly_salary"]
     updates["updated_at"] = now_utc()
     result = await get_db().employees.find_one_and_update(
         {"company_id": user["company_id"], "employee_id": employee_id},

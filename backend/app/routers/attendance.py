@@ -1,5 +1,7 @@
 import asyncio
 from collections import Counter
+from datetime import datetime, time, timezone
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -118,3 +120,60 @@ async def summary(user=Depends(current_user)):
     employees = await get_db().employees.find({"company_id": user["company_id"]}).to_list(100)
     records = await get_db().attendance.find({"company_id": user["company_id"], "timestamp": {"$gte": start, "$lte": end}}).to_list(500)
     return {"success": True, "data": {"total_employees": len(employees), "registered_faces": len([e for e in employees if e.get("face_embeddings")]), "present_today": len(set(r["employee_id"] for r in records if r["type"] == "login")), "records_today": len(records)}}
+
+
+@router.get("/payroll")
+async def payroll(month: str | None = None, user=Depends(require_role("admin"))):
+    settings = get_settings()
+    tz = ZoneInfo(settings.company_timezone)
+    today_local = now_utc().astimezone(tz)
+    try:
+        month_start_date = datetime.strptime(month or today_local.strftime("%Y-%m"), "%Y-%m").date().replace(day=1)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Month must use YYYY-MM format")
+    if month_start_date.month == 12:
+        next_month_date = month_start_date.replace(year=month_start_date.year + 1, month=1)
+    else:
+        next_month_date = month_start_date.replace(month=month_start_date.month + 1)
+    start = datetime.combine(month_start_date, time.min, tzinfo=tz).astimezone(timezone.utc)
+    end = datetime.combine(next_month_date, time.min, tzinfo=tz).astimezone(timezone.utc)
+    employees = await get_db().employees.find({"company_id": user["company_id"]}).sort("name", 1).to_list(300)
+    records = await get_db().attendance.find({"company_id": user["company_id"], "timestamp": {"$gte": start, "$lt": end}}).sort("timestamp", 1).to_list(2000)
+    records_by_employee = {}
+    for record in records:
+        records_by_employee.setdefault(record["employee_id"], []).append(record)
+    rows = []
+    for employee in employees:
+        items = records_by_employee.get(employee["employee_id"], [])
+        open_login = None
+        worked_seconds = 0
+        worked_days = set()
+        for item in items:
+            if item["type"] == "login":
+                open_login = item["timestamp"]
+                worked_days.add(local_date_key(item["timestamp"], settings.company_timezone))
+            elif item["type"] == "logout" and open_login:
+                worked_seconds += max(0, (item["timestamp"] - open_login).total_seconds())
+                open_login = None
+        worked_hours = round(worked_seconds / 3600, 2)
+        standard_daily_hours = float(employee.get("standard_daily_hours") or 8)
+        expected_hours = round(len(worked_days) * standard_daily_hours, 2)
+        overtime_hours = round(max(0, worked_hours - expected_hours), 2)
+        monthly_salary = float(employee.get("monthly_salary") or employee.get("salary") or 0)
+        overtime_rate = float(employee.get("overtime_hourly_rate") or 0)
+        overtime_pay = round(overtime_hours * overtime_rate, 2)
+        rows.append({
+            "employee_id": employee["employee_id"],
+            "employee_name": employee["name"],
+            "department": employee.get("department", "General"),
+            "month": month_start_date.strftime("%Y-%m"),
+            "worked_days": len(worked_days),
+            "working_days_per_week": employee.get("working_days_per_week", 6),
+            "worked_hours": worked_hours,
+            "expected_hours": expected_hours,
+            "overtime_hours": overtime_hours,
+            "monthly_salary": monthly_salary,
+            "overtime_pay": overtime_pay,
+            "total_pay": round(monthly_salary + overtime_pay, 2)
+        })
+    return {"success": True, "data": rows}
