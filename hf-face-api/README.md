@@ -1,3 +1,12 @@
+---
+title: AttendXsuite Face API
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # AttendXsuite Hugging Face Face API
 
 Standalone Face API for Hugging Face Docker Spaces.

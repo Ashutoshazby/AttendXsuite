@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: attendxsuite-backend
+    env: python
+    plan: free
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: CLIENT_ORIGINS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: COMPANY_TIMEZONE
+        value: Asia/Kolkata
+      - key: FACE_ENGINE
+        value: huggingface
+      - key: HF_FACE_API_URL
+        sync: false
+      - key: HF_FACE_API_TOKEN
+        sync: false
+      - key: HF_FACE_MODEL
+        value: buffalo_s
+      - key: HF_TIMEOUT_SECONDS
+        value: 30
+      - key: FACE_MATCH_THRESHOLD
+        value: 0.48
+      - key: FACE_MATCH_MARGIN
+        value: 0.06
+      - key: FACE_SCAN_FRAME_COUNT
+        value: 5
+      - key: FACE_SCAN_CONSENSUS
+        value: 3
