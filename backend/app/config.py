@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     client_origins: str = "http://127.0.0.1:8061,http://localhost:8061"
     company_timezone: str = "Asia/Kolkata"
 
-    face_engine: str = "opencv"
-    hf_face_api_url: str = ""
+    face_engine: str = "huggingface"
+    hf_face_api_url: str = "https://ashutoshtiwariazby-attendxsuite-face-api.hf.space"
     hf_face_api_token: str = "replace_with_secret_token"
     hf_face_model: str = "buffalo_s"
     hf_timeout_seconds: int = 60

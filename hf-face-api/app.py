@@ -5,7 +5,7 @@ os.environ.setdefault("GRADIO_SSR_MODE", "False")
 
 import gradio as gr
 
-from face_core import FaceApiError, embed_base64, embed_many_base64, match_base64, require_api_token
+from face_core import FaceApiError, embed_base64, embed_many_base64, match_base64, require_api_token, warmup_model
 
 try:
     import spaces
@@ -28,8 +28,13 @@ def scan_duration(frames: list[str], *_args) -> int:
     return 8 + (frame_count * 4)
 
 
+@gpu_task(duration=60)
 def health() -> dict:
-    return {"success": True, "message": "AttendXsuite Gradio face API running"}
+    try:
+        warmup = warmup_model()
+        return {"success": True, "message": "AttendXsuite Gradio face API running", "data": warmup}
+    except FaceApiError as error:
+        return {"success": False, "detail": error.detail, "status_code": error.status_code}
 
 
 @gpu_task(duration=60)

@@ -39,15 +39,13 @@ def get_face_app(model_name: str):
         return face_app
     except Exception as error:
         print(f"[AttendXsuite HF] InsightFace unavailable: {error}")
-        return None
+        raise FaceApiError(503, "InsightFace model is not ready. Please try again in a few seconds.")
 
 
-def fallback_embedding(image: np.ndarray) -> list[float]:
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    small = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
-    vector = small.flatten()
-    norm = np.linalg.norm(vector) or 1.0
-    return (vector / norm).tolist()
+def warmup_model(model_name: str | None = None) -> dict:
+    model = model_name or os.getenv("HF_FACE_MODEL", "buffalo_s")
+    get_face_app(model)
+    return {"model": model, "ready": True}
 
 
 def embed_image(image: np.ndarray, model_name: str) -> dict:
@@ -56,10 +54,8 @@ def embed_image(image: np.ndarray, model_name: str) -> dict:
         try:
             faces = face_app.get(image)
         except Exception as error:
-            print(f"[AttendXsuite HF] InsightFace runtime failed, using fallback: {error}")
-            faces = []
-            face_app = None
-    if face_app:
+            print(f"[AttendXsuite HF] InsightFace runtime failed: {error}")
+            raise FaceApiError(503, "InsightFace failed while processing the photo. Please try again.")
         if len(faces) != 1:
             raise FaceApiError(422, "Exactly one clear face is required")
         face = faces[0]
@@ -72,13 +68,6 @@ def embed_image(image: np.ndarray, model_name: str) -> dict:
             "quality": {"det_score": float(face.det_score), "usable": True},
             "model": model_name,
         }
-
-    return {
-        "embedding": fallback_embedding(image),
-        "face_box": [0, 0, int(image.shape[1]), int(image.shape[0])],
-        "quality": {"fallback": "opencv", "usable": True},
-        "model": "opencv-fallback",
-    }
 
 
 def embed_base64(image_base64: str, model_name: str | None = None) -> dict:
