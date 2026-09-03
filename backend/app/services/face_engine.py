@@ -139,11 +139,7 @@ async def create_embeddings(frames: list[str]) -> list[dict]:
 
 
 async def _gradio_embedding(image_base64: str, settings) -> dict:
-    result = await _gradio_call("embed", {
-        "image_base64": image_base64,
-        "api_token": settings.hf_face_api_token,
-        "model": settings.hf_face_model,
-    }, settings)
+    result = await _gradio_call("embed", [image_base64, settings.hf_face_api_token, settings.hf_face_model], settings)
     if not isinstance(result, dict) or not result.get("success"):
         detail = result.get("detail", "Face could not be processed") if isinstance(result, dict) else f"Face could not be processed: {result}"
         status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
@@ -152,11 +148,7 @@ async def _gradio_embedding(image_base64: str, settings) -> dict:
 
 
 async def _gradio_embeddings(frames: list[str], settings) -> list[dict]:
-    result = await _gradio_call("embed_many", {
-        "frames": frames,
-        "api_token": settings.hf_face_api_token,
-        "model": settings.hf_face_model,
-    }, settings)
+    result = await _gradio_call("embed_many", [frames, settings.hf_face_api_token, settings.hf_face_model], settings)
     if not isinstance(result, dict) or not result.get("success"):
         detail = result.get("detail", "Faces could not be processed") if isinstance(result, dict) else f"Faces could not be processed: {result}"
         status_code = result.get("status_code", 422) if isinstance(result, dict) else 422
@@ -164,13 +156,11 @@ async def _gradio_embeddings(frames: list[str], settings) -> list[dict]:
     return result["data"]
 
 
-async def _gradio_call(endpoint: str, payload: dict, settings):
+async def _gradio_call(endpoint: str, data: list, settings):
     base_url = settings.hf_face_api_url.rstrip("/")
     timeout = httpx.Timeout(settings.hf_timeout_seconds, connect=15)
     async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(f"{base_url}/gradio_api/call/v2/{endpoint}", json=payload)
-        if response.status_code == 404:
-            response = await client.post(f"{base_url}/gradio_api/call/{endpoint}", json={"data": list(payload.values())})
+        response = await client.post(f"{base_url}/gradio_api/call/{endpoint}", json={"data": data})
         if response.status_code >= 400:
             raise HTTPException(status_code=response.status_code, detail=_response_detail(response, "Face service endpoint not found"))
         event_id = response.json().get("event_id")
@@ -179,18 +169,34 @@ async def _gradio_call(endpoint: str, payload: dict, settings):
         result = await client.get(f"{base_url}/gradio_api/call/{endpoint}/{event_id}")
         if result.status_code >= 400:
             raise HTTPException(status_code=result.status_code, detail=_response_detail(result, "Face service result not found"))
+    error_seen = False
+    latest_data = None
     for line in result.text.splitlines():
         if line.startswith("event: error"):
-            raise HTTPException(status_code=503, detail="Face service failed while processing the photo")
+            error_seen = True
         if line.startswith("data: "):
-            data = json.loads(line.removeprefix("data: "))
-            if isinstance(data, list) and data and isinstance(data[0], str):
+            latest_data = json.loads(line.removeprefix("data: "))
+            if isinstance(latest_data, list) and latest_data and isinstance(latest_data[0], str):
                 try:
-                    data[0] = json.loads(data[0])
+                    latest_data[0] = json.loads(latest_data[0])
                 except json.JSONDecodeError:
                     pass
-            return data[0] if isinstance(data, list) and data else data
+            if not error_seen:
+                return latest_data[0] if isinstance(latest_data, list) and latest_data else latest_data
+    if error_seen:
+        detail = _gradio_error_detail(latest_data)
+        raise HTTPException(status_code=503, detail=detail)
     raise HTTPException(status_code=503, detail="Face service returned no result")
+
+
+def _gradio_error_detail(data) -> str:
+    if isinstance(data, list) and data:
+        data = data[0]
+    if isinstance(data, dict):
+        return data.get("detail") or data.get("error") or "Face service failed while processing the photo"
+    if isinstance(data, str) and data:
+        return data[:500]
+    return "Face service failed while processing the photo"
 
 
 def _response_detail(response, fallback: str) -> str:
