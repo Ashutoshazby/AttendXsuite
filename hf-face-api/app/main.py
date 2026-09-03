@@ -6,7 +6,7 @@ import numpy as np
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from face_core import FaceApiError, cosine, decode_base64_image, embed_image
+from face_core import FaceApiError, cosine, decode_base64_image, embed_image, embed_many_base64, warmup_model
 
 app = FastAPI(title="AttendXsuite HF Face API")
 
@@ -23,6 +23,11 @@ class MatchPayload(BaseModel):
     margin: float = 0.06
 
 
+class EmbedManyPayload(BaseModel):
+    frames: list[str]
+    model: str | None = None
+
+
 def require_token(authorization: str | None = Header(default=None)):
     expected = os.getenv("HF_FACE_API_TOKEN", "replace_with_secret_token")
     if authorization != f"Bearer {expected}":
@@ -31,7 +36,10 @@ def require_token(authorization: str | None = Header(default=None)):
 
 @app.get("/health")
 def health():
-    return {"success": True, "message": "AttendXsuite HF face API running"}
+    try:
+        return {"success": True, "message": "AttendXsuite face API running", "data": warmup_model()}
+    except FaceApiError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail)
 
 
 @app.post("/embed", dependencies=[Depends(require_token)])
@@ -48,6 +56,14 @@ async def embed(payload: EmbedPayload | None = None, image: UploadFile | None = 
         raise HTTPException(status_code=422, detail="Invalid image")
     try:
         return {"success": True, "data": embed_image(frame, model_name)}
+    except FaceApiError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+@app.post("/embed_many", dependencies=[Depends(require_token)])
+async def embed_many(payload: EmbedManyPayload):
+    try:
+        return {"success": True, "data": embed_many_base64((payload.frames or [])[:5], payload.model)}
     except FaceApiError as error:
         raise HTTPException(status_code=error.status_code, detail=error.detail)
 
