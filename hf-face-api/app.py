@@ -7,28 +7,6 @@ import gradio as gr
 
 from face_core import FaceApiError, embed_base64, embed_many_base64, match_base64, require_api_token, warmup_model
 
-try:
-    import spaces
-except ImportError:
-    spaces = None
-
-
-def gpu_task(duration: int = 60):
-    if spaces:
-        return spaces.GPU(duration=duration)
-
-    def decorator(fn):
-        return fn
-
-    return decorator
-
-
-def scan_duration(frames: list[str], *_args) -> int:
-    frame_count = max(1, min(len(frames or []), 5))
-    return 8 + (frame_count * 4)
-
-
-@gpu_task(duration=60)
 def health() -> dict:
     try:
         warmup = warmup_model()
@@ -37,7 +15,6 @@ def health() -> dict:
         return {"success": False, "detail": error.detail, "status_code": error.status_code}
 
 
-@gpu_task(duration=60)
 def embed(image_base64: str, api_token: str, model: str | None = None) -> dict:
     try:
         require_api_token(api_token)
@@ -48,7 +25,6 @@ def embed(image_base64: str, api_token: str, model: str | None = None) -> dict:
         return {"success": False, "detail": f"Face engine crashed: {error}", "status_code": 503}
 
 
-@gpu_task(duration=scan_duration)
 def embed_many(frames: list[str], api_token: str, model: str | None = None) -> dict:
     try:
         require_api_token(api_token)
@@ -59,7 +35,6 @@ def embed_many(frames: list[str], api_token: str, model: str | None = None) -> d
         return {"success": False, "detail": f"Face engine crashed: {error}", "status_code": 503}
 
 
-@gpu_task(duration=30)
 def match(image_base64: str, employees: list[dict[str, Any]], api_token: str, threshold: float = 0.48, margin: float = 0.06) -> dict:
     try:
         require_api_token(api_token)

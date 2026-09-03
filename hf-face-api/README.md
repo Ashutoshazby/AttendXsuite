@@ -10,6 +10,8 @@ pinned: false
 
 Standalone Face API for Hugging Face Gradio Spaces.
 
+Runs on Hugging Face's free CPU hardware. Do not enable ZeroGPU for this Space; CPU avoids ZeroGPU quota limits while keeping InsightFace recognition.
+
 ## Endpoints
 
 - `GET /health`
@@ -36,6 +38,6 @@ HF_FACE_MODEL=buffalo_s
 PORT=7860
 ```
 
-Start with `buffalo_s` for lower CPU cost. Upgrade to `buffalo_l` later if accuracy needs it.
+Start with `buffalo_s` for lower CPU cost. Upgrade to `buffalo_l` later if accuracy needs it and the free CPU runtime remains responsive enough.
 
 The service does not permanently store photos, passwords, users, or attendance data.
