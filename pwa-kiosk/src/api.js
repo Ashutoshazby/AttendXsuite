@@ -5,9 +5,12 @@ if (queryApi) localStorage.setItem("attendxsuite_api", queryApi.replace(/\/$/, "
 export const API_BASE =
   localStorage.getItem("attendxsuite_api") ||
   import.meta.env.VITE_API_URL ||
-  (["localhost", "127.0.0.1"].includes(window.location.hostname) || window.location.hostname.startsWith("192.168."))
-    ? `${window.location.protocol}//${window.location.hostname}:8070`
-    : "";
+  ((["localhost", "127.0.0.1"].includes(window.location.hostname) ||
+    window.location.hostname.startsWith("10.") ||
+    window.location.hostname.startsWith("172.") ||
+    window.location.hostname.startsWith("192.168."))
+      ? `${window.location.protocol}//${window.location.hostname}:8070`
+      : "");
 
 export const request = async (path, { token, ...options } = {}) => {
   const response = await fetch(`${API_BASE}${path}`, {

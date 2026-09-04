@@ -12,10 +12,10 @@ hf-face-api/   Separate Hugging Face Gradio Space face embedding API
 scripts/       Local start, stop, tunnel, and smoke-check scripts
 ```
 
-## Local Start
+## Local Laptop Server Start
 
 ```powershell
-cd D:\attendify\Attendify\AttendXsuite
+cd D:\AttendXsuite
 npm run install:all
 npm start
 ```
@@ -23,15 +23,49 @@ npm start
 Open:
 
 ```text
-Dashboard: http://127.0.0.1:8061
-Backend:   http://127.0.0.1:8070/health
+Dashboard on server laptop: http://127.0.0.1:8061
+Backend on server laptop:   http://127.0.0.1:8070/health
+Dashboard on other devices: http://<server-laptop-ip>:8061
 ```
+
+`npm start` prints the detected LAN URL, for example `http://192.168.1.25:8061`. Use that URL from phones or other computers connected to the same Wi-Fi/LAN.
+
+If you are running this on the same laptop as the HMS server at `192.168.1.14`, open:
+
+```text
+Attendance Dashboard: http://192.168.1.14:8061
+Attendance Backend:   http://192.168.1.14:8070/health
+```
+
+The start script trusts `192.168.1.14` by default. To use a different fixed server IP, run PowerShell like this before `npm start`:
+
+```powershell
+$env:ATTENDX_SERVER_IP="192.168.1.14"
+npm start
+```
+
+If another device cannot open the dashboard:
+
+- Keep the server laptop awake and connected to the same network.
+- Allow Windows Firewall access for Node.js and Python when prompted.
+- If needed, manually allow inbound TCP ports `8061` and `8070`.
+- Run `ipconfig` on the server laptop and use the IPv4 address shown for the active Wi-Fi/LAN adapter.
+
+The local script uses `FACE_ENGINE=opencv`, so it does not depend on the Hugging Face hosted face API for normal local use. MongoDB runs through Docker on port `27018` when Docker is available; otherwise the backend falls back to a local JSON database.
+
+Create a local backup any time with:
+
+```powershell
+npm run backup
+```
+
+For a 25-30 employee hospital setup, run this at least once daily and keep a copy on a pen drive or another computer.
 
 ## Attendance
 
 For now, mark attendance from the dashboard:
 
-1. Open `http://127.0.0.1:8061`.
+1. Open `http://127.0.0.1:8061` on the server laptop, or `http://<server-laptop-ip>:8061` from another device on the same network.
 2. Login or create a company.
 3. Create employees.
 4. Register faces from Face Registry.

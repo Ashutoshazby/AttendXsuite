@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import ReturnDocument
 from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
@@ -107,6 +108,7 @@ class LocalCollection:
     async def insert_one(self, doc):
         doc = dict(doc)
         doc.setdefault("_id", ObjectId())
+        self._ensure_unique(doc)
         self.docs.append(doc)
         self.database.save()
         return SimpleNamespace(inserted_id=doc["_id"])
@@ -122,10 +124,10 @@ class LocalCollection:
     async def update_one(self, query, update):
         doc = await self.find_one(query)
         if not doc:
-            return SimpleNamespace(modified_count=0)
+            return SimpleNamespace(matched_count=0, modified_count=0)
         self._apply(doc, update)
         self.database.save()
-        return SimpleNamespace(modified_count=1)
+        return SimpleNamespace(matched_count=1, modified_count=1)
 
     async def find_one_and_update(self, query, update, return_document=ReturnDocument.AFTER):
         doc = await self.find_one(query)
@@ -150,6 +152,19 @@ class LocalCollection:
                     doc[key] = target[keep:] if keep < 0 else target[:keep]
             else:
                 target.append(value)
+
+    def _ensure_unique(self, doc):
+        checks = {
+            "companies": ("admin_email",),
+            "users": ("email",),
+            "employees": ("company_id", "employee_id"),
+        }
+        fields = checks.get(self.name)
+        if not fields:
+            return
+        for existing in self.docs:
+            if all(_same(existing.get(field), doc.get(field)) for field in fields):
+                raise DuplicateKeyError(f"Duplicate local key for {self.name}: {', '.join(fields)}")
 
 
 class LocalDatabase:

@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from ..config import get_settings
 from ..database import get_db
-from ..dependencies import current_user, require_role
+from ..dependencies import require_role
 from ..services.face_engine import best_match, create_embeddings
 from ..services.realtime import publish, subscribe, sse
 from ..utils.timezone import day_range_utc, local_date_key, local_time_label, now_utc
@@ -18,6 +18,7 @@ PUNCH_GAP_SECONDS = 60
 
 class ScanPayload(BaseModel):
     frames: list[str]
+    face_descriptors: list[list[float]] | None = None
     device_id: str = "pwa-kiosk"
     timestamp: str | None = None
 
@@ -58,7 +59,8 @@ async def scan(payload: ScanPayload, user=Depends(require_role("admin", "user"))
     votes = []
     scores = []
     errors = []
-    faces = await create_embeddings(frames)
+    descriptors = [item for item in (payload.face_descriptors or []) if len(item) == 128]
+    faces = [{"embedding": descriptor, "model": "face-api"} for descriptor in descriptors[: settings.face_scan_frame_count]] if descriptors else await create_embeddings(frames)
     for face in faces:
         try:
             match = best_match(face["embedding"], employees)
@@ -79,7 +81,7 @@ async def scan(payload: ScanPayload, user=Depends(require_role("admin", "user"))
     employee = await get_db().employees.find_one({"company_id": user["company_id"], "employee_id": winner})
     action = await attendance_type(user["company_id"], winner, now_utc())
     sample = (employee.get("face_samples") or [])[-1] if employee else {}
-    return {"success": True, "data": {"employee_id": winner, "employee_name": employee["name"], "action": action, "face_preview": sample.get("image_base64", "")}}
+    return {"success": True, "data": {"employee_id": winner, "employee_name": employee["name"], "action": action, "confidence": round(average_score * 100), "face_preview": sample.get("image_base64", "")}}
 
 
 class ConfirmPayload(BaseModel):
@@ -112,7 +114,7 @@ async def confirm(payload: ConfirmPayload, user=Depends(require_role("admin", "u
 
 
 @router.get("/today")
-async def today(user=Depends(require_role("admin", "user"))):
+async def today(user=Depends(require_role("admin"))):
     timezone = get_settings().company_timezone
     start, end = day_range_utc(tz=timezone)
     employees = await get_db().employees.find({"company_id": user["company_id"]}).to_list(100)
@@ -140,7 +142,7 @@ async def today(user=Depends(require_role("admin", "user"))):
 
 
 @router.get("/summary")
-async def summary(user=Depends(current_user)):
+async def summary(user=Depends(require_role("admin"))):
     start, end = day_range_utc(tz=get_settings().company_timezone)
     employees = await get_db().employees.find({"company_id": user["company_id"]}).to_list(100)
     records = await get_db().attendance.find({"company_id": user["company_id"], "timestamp": {"$gte": start, "$lte": end}}).to_list(500)

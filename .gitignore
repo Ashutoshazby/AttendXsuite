@@ -38,6 +38,7 @@ pwa-kiosk/dist/
 # Local databases and generated data
 backend/local-data/
 backend/mongo-data/
+backups/
 *.sqlite
 *.db
 

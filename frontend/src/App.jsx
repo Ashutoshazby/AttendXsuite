@@ -67,6 +67,11 @@ const cleanEmployeePayload = (form) => ({
   active: form.active !== false
 });
 
+const createFaceDescriptor = async (image) => {
+  const face = await import("./face");
+  return face.createDescriptor(image);
+};
+
 function App() {
   const faceVideoRef = useRef(null);
   const attendanceVideoRef = useRef(null);
@@ -85,6 +90,7 @@ function App() {
   const [summary, setSummary] = useState(null);
   const [selected, setSelected] = useState("");
   const [faceCaptures, setFaceCaptures] = useState([]);
+  const [faceDescriptors, setFaceDescriptors] = useState([]);
   const [faceSaveMode, setFaceSaveMode] = useState("append");
   const [faceCameraReady, setFaceCameraReady] = useState(false);
   const [attendanceCandidate, setAttendanceCandidate] = useState(null);
@@ -95,12 +101,19 @@ function App() {
 
   const authed = Boolean(token);
   const admin = user?.role === "admin";
+  const availablePages = useMemo(
+    () => admin
+      ? [["overview", "Overview", Activity], ["face-registration", "Face Registration", Camera], ["employees", "Employees", Users], ["payroll", "Payroll", Banknote], ["users", "Users", UserPlus], ["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]]
+      : [["kiosk", "Scan", Clock3]],
+    [admin]
+  );
   const selectedEmployee = useMemo(() => employees.find((item) => item.employee_id === selected), [employees, selected]);
   const stats = useMemo(() => summary || { total_employees: employees.length, present_today: 0, registered_faces: 0, records_today: 0 }, [summary, employees]);
   const api = (path, options) => request(path, { token, ...options });
 
   const refresh = async () => {
     if (!token) return;
+    if (!admin) return;
     const requests = [api("/employees/list"), api("/attendance/today"), api("/attendance/summary")];
     if (admin) requests.push(api("/auth/users"));
     if (admin) requests.push(api("/attendance/payroll"));
@@ -128,7 +141,7 @@ function App() {
       localStorage.setItem(USER, JSON.stringify(body.data.user));
       setToken(body.data.token);
       setUser(body.data.user);
-      setPage("overview");
+      setPage(body.data.user.role === "admin" ? "overview" : "kiosk");
       setMessage("Signed in.");
     } catch (error) {
       setMessage(error.message);
@@ -188,11 +201,14 @@ function App() {
     }
   };
 
-  const captureFace = () => {
+  const captureFace = async () => {
     try {
       if (faceCaptures.length >= MAX_FACE_SAMPLES) throw new Error("Maximum 5 face samples are allowed.");
       const nextCount = faceCaptures.length + 1;
-      setFaceCaptures((items) => [...items, captureFromVideo(faceVideoRef.current, 0.82)]);
+      const image = captureFromVideo(faceVideoRef.current, 0.88);
+      const descriptor = await createFaceDescriptor(image);
+      setFaceCaptures((items) => [...items, image]);
+      setFaceDescriptors((items) => [...items, descriptor]);
       setMessage(`${nextCount}/5 face samples captured.`);
     } catch (error) {
       setMessage(error.message);
@@ -203,12 +219,13 @@ function App() {
     setBusy(true);
     try {
       if (!selected) throw new Error("Select an employee first.");
-      if (!faceCaptures.length) throw new Error("Capture at least one face sample.");
+      if (faceCaptures.length < 3) throw new Error("Capture at least 3 face samples for reliable matching.");
       const response = await api("/faces/register", {
         method: "POST",
-        body: JSON.stringify({ employee_id: selected, images_base64: faceCaptures, replace_existing: faceSaveMode === "replace" })
+        body: JSON.stringify({ employee_id: selected, images_base64: faceCaptures, face_descriptors: faceDescriptors, replace_existing: faceSaveMode === "replace" })
       });
       setFaceCaptures([]);
+      setFaceDescriptors([]);
       setMessage(`${response.data.registered_faces || 1} face sample(s) ${faceSaveMode === "replace" ? "updated" : "saved"}.`);
       await refresh();
     } catch (error) {
@@ -294,17 +311,18 @@ function App() {
     setBusy(true);
     try {
       if (!attendanceCameraReady) await startAttendanceCamera();
-      if (!employees.some((item) => item.face_embeddings?.length)) {
-        throw new Error("No registered face found. Register face first.");
-      }
       const frames = [];
       for (let index = 0; index < 5; index += 1) {
         frames.push(captureFromVideo(attendanceVideoRef.current));
         await new Promise((resolve) => setTimeout(resolve, 130));
       }
+      const descriptors = [];
+      for (const frame of frames) {
+        descriptors.push(await createFaceDescriptor(frame));
+      }
       const response = await api("/attendance/scan", {
         method: "POST",
-        body: JSON.stringify({ frames, device_id: "dashboard-kiosk", timestamp: new Date().toISOString() })
+        body: JSON.stringify({ frames, face_descriptors: descriptors, device_id: "dashboard-kiosk", timestamp: new Date().toISOString() })
       });
       setAttendanceCandidate(response.data);
       setMessage(`${response.data.employee_name} found. Confirm ${response.data.action}.`);
@@ -349,6 +367,12 @@ function App() {
   }, [token, user?.role]);
 
   useEffect(() => {
+    if (token && !availablePages.some(([key]) => key === page)) {
+      setPage(availablePages[0][0]);
+    }
+  }, [token, page, availablePages]);
+
+  useEffect(() => {
     if (!token) return undefined;
     const source = new EventSource(`${API_BASE}/attendance/events?token=${encodeURIComponent(token)}`);
     source.addEventListener("attendance-updated", () => refresh().catch(() => {}));
@@ -377,9 +401,7 @@ function App() {
     );
   }
 
-  const pages = admin
-    ? [["overview", "Overview", Activity], ["face-registration", "Face Registration", Camera], ["employees", "Employees", Users], ["payroll", "Payroll", Banknote], ["users", "Users", UserPlus], ["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]]
-    : [["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]];
+  const pages = availablePages;
 
   return (
     <main className="app-shell">
@@ -452,7 +474,10 @@ function App() {
               </div>
               <div className="face-samples">
                 {faceCaptures.map((image, index) => (
-                  <button type="button" className="sample" key={`${image.length}-${index}`} onClick={() => setFaceCaptures((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                  <button type="button" className="sample" key={`${image.length}-${index}`} onClick={() => {
+                    setFaceCaptures((items) => items.filter((_, itemIndex) => itemIndex !== index));
+                    setFaceDescriptors((items) => items.filter((_, itemIndex) => itemIndex !== index));
+                  }}>
                     <img src={image} alt={`Face sample ${index + 1}`} />
                     <span>{index + 1}</span>
                   </button>
@@ -571,7 +596,7 @@ function App() {
               {attendanceCandidate && (
                 <div className="confirm-box">
                   {attendanceCandidate.face_preview && <img src={`data:image/jpeg;base64,${attendanceCandidate.face_preview}`} alt={attendanceCandidate.employee_name} />}
-                  <div><h3>{attendanceCandidate.employee_name} {attendanceCandidate.action === "login" ? "Login" : "Logout"}</h3><p>Confirm this attendance action.</p></div>
+                  <div><h3>{attendanceCandidate.employee_name} {attendanceCandidate.action === "login" ? "Login" : "Logout"}</h3><p>Confirm this attendance action{attendanceCandidate.confidence ? ` (${attendanceCandidate.confidence}% confidence)` : ""}.</p></div>
                   <button onClick={confirmAttendance} disabled={busy}><CheckCircle2 size={18} /> {attendanceCandidate.action === "login" ? "Login" : "Logout"}</button>
                   <button className="ghost" onClick={() => setAttendanceCandidate(null)}>Scan Again</button>
                 </div>

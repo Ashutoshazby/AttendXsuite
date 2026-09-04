@@ -216,18 +216,26 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
     return float(np.dot(a, b) / denom)
 
 
+def face_api_score(left: list[float], right: list[float]) -> float:
+    if len(left) != len(right):
+        return -1.0
+    distance = float(np.linalg.norm(np.array(left, dtype=np.float32) - np.array(right, dtype=np.float32)))
+    return max(0.0, 1.0 - distance)
+
+
 def best_match(embedding: list[float], employees: list[dict]) -> dict:
     settings = get_settings()
     fallback_mode = len(embedding) == 2000
-    threshold = 0.64 if fallback_mode else settings.face_match_threshold
-    margin = 0.12 if fallback_mode else settings.face_match_margin
+    face_api_mode = len(embedding) == 128
+    threshold = 0.52 if face_api_mode else 0.64 if fallback_mode else settings.face_match_threshold
+    margin = 0.08 if face_api_mode else 0.12 if fallback_mode else settings.face_match_margin
     scored_by_employee = {}
     for employee in employees:
         vectors = employee.get("face_embeddings") or []
         if employee.get("face_embedding"):
             vectors.append(employee["face_embedding"])
         for vector in vectors:
-            score = cosine_similarity(embedding, vector)
+            score = face_api_score(embedding, vector) if face_api_mode and len(vector) == 128 else cosine_similarity(embedding, vector)
             employee_id = employee["employee_id"]
             current = scored_by_employee.get(employee_id)
             if not current or score > current["score"]:
