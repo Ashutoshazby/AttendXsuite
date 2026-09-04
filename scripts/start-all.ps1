@@ -4,19 +4,49 @@ $Backend = Join-Path $Root "backend"
 $Frontend = Join-Path $Root "frontend"
 $PortableMongo = Join-Path $Root "tools\mongodb-win32-x86_64-windows-8.0.29\bin\mongod.exe"
 $MongoData = Join-Path $Backend "mongo-data"
+$LanIp = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.IPAddress -notlike "169.254.*" -and
+    $_.IPAddress -ne "127.0.0.1" -and
+    $_.PrefixOrigin -ne "WellKnown"
+  } |
+  Sort-Object InterfaceMetric |
+  Select-Object -First 1 -ExpandProperty IPAddress
+$DashboardOrigins = @("http://127.0.0.1:8061", "http://localhost:8061")
+if ($LanIp) {
+  $DashboardOrigins += "http://$($LanIp):8061"
+}
+$HmsServerIp = $env:ATTENDX_SERVER_IP
+if (-not $HmsServerIp) {
+  $HmsServerIp = "192.168.1.14"
+}
+if ($HmsServerIp -and $HmsServerIp -ne $LanIp) {
+  $DashboardOrigins += "http://$($HmsServerIp):8061"
+}
 
 foreach ($port in 8060, 8061, 8062, 8070) {
   Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 }
 
+$DockerReady = $false
 if (Get-Command docker -ErrorAction SilentlyContinue) {
+  $PreviousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  docker info *> $null
+  $DockerReady = $LASTEXITCODE -eq 0
+  $ErrorActionPreference = $PreviousErrorActionPreference
+}
+
+if ($DockerReady) {
   $mongo = docker ps -a --filter "name=attendxsuite-mongo" --format "{{.Names}}" 2>$null
   if ($mongo -contains "attendxsuite-mongo") {
     docker start attendxsuite-mongo | Out-Null
   } else {
     docker run -d --name attendxsuite-mongo -p 27018:27017 -v attendxsuite-mongo-data:/data/db mongo:7 | Out-Null
   }
+} elseif (Get-Command docker -ErrorAction SilentlyContinue) {
+  Write-Host "Docker is installed but not running. Trying portable MongoDB or local JSON fallback."
 }
 
 $MongoUri = "mongodb://127.0.0.1:27018/attendxsuite"
@@ -50,7 +80,7 @@ $envContent = @"
 PORT=8070
 MONGODB_URI=$MongoUri
 JWT_SECRET=attendxsuite_local_secret
-CLIENT_ORIGINS=http://127.0.0.1:8061,http://localhost:8061
+CLIENT_ORIGINS=$($DashboardOrigins -join ",")
 FACE_ENGINE=opencv
 HF_FACE_API_TOKEN=replace_with_secret_token
 FACE_MATCH_THRESHOLD=0.48
@@ -68,4 +98,14 @@ Start-Sleep -Seconds 7
 Write-Host "AttendXsuite running:"
 Write-Host "Backend:   http://127.0.0.1:8070/health"
 Write-Host "Dashboard: http://127.0.0.1:8061"
+if ($LanIp) {
+  Write-Host "LAN Dashboard: http://$($LanIp):8061"
+  Write-Host "LAN Backend:   http://$($LanIp):8070/health"
+  Write-Host "Use the LAN Dashboard URL from phones/other PCs on the same Wi-Fi/LAN."
+} else {
+  Write-Host "LAN IP was not detected. Run ipconfig and open http://<your-ip>:8061 from other devices."
+}
+if ($HmsServerIp) {
+  Write-Host "Configured server IP: http://$($HmsServerIp):8061"
+}
 Write-Host "PWA:       on hold"

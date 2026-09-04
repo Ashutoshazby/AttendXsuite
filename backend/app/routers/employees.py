@@ -38,7 +38,7 @@ async def ensure_unique_face(company_id: str, employee_id: str, embedding: list[
 
 
 @router.get("/list")
-async def list_employees(user=Depends(require_role("admin", "user"))):
+async def list_employees(user=Depends(require_role("admin"))):
     employees = await get_db().employees.find({"company_id": user["company_id"]}).sort("name", 1).to_list(200)
     for employee in employees:
         employee["_id"] = str(employee["_id"])

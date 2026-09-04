@@ -95,12 +95,19 @@ function App() {
 
   const authed = Boolean(token);
   const admin = user?.role === "admin";
+  const availablePages = useMemo(
+    () => admin
+      ? [["overview", "Overview", Activity], ["face-registration", "Face Registration", Camera], ["employees", "Employees", Users], ["payroll", "Payroll", Banknote], ["users", "Users", UserPlus], ["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]]
+      : [["kiosk", "Scan", Clock3]],
+    [admin]
+  );
   const selectedEmployee = useMemo(() => employees.find((item) => item.employee_id === selected), [employees, selected]);
   const stats = useMemo(() => summary || { total_employees: employees.length, present_today: 0, registered_faces: 0, records_today: 0 }, [summary, employees]);
   const api = (path, options) => request(path, { token, ...options });
 
   const refresh = async () => {
     if (!token) return;
+    if (!admin) return;
     const requests = [api("/employees/list"), api("/attendance/today"), api("/attendance/summary")];
     if (admin) requests.push(api("/auth/users"));
     if (admin) requests.push(api("/attendance/payroll"));
@@ -128,7 +135,7 @@ function App() {
       localStorage.setItem(USER, JSON.stringify(body.data.user));
       setToken(body.data.token);
       setUser(body.data.user);
-      setPage("overview");
+      setPage(body.data.user.role === "admin" ? "overview" : "kiosk");
       setMessage("Signed in.");
     } catch (error) {
       setMessage(error.message);
@@ -294,9 +301,6 @@ function App() {
     setBusy(true);
     try {
       if (!attendanceCameraReady) await startAttendanceCamera();
-      if (!employees.some((item) => item.face_embeddings?.length)) {
-        throw new Error("No registered face found. Register face first.");
-      }
       const frames = [];
       for (let index = 0; index < 5; index += 1) {
         frames.push(captureFromVideo(attendanceVideoRef.current));
@@ -349,6 +353,12 @@ function App() {
   }, [token, user?.role]);
 
   useEffect(() => {
+    if (token && !availablePages.some(([key]) => key === page)) {
+      setPage(availablePages[0][0]);
+    }
+  }, [token, page, availablePages]);
+
+  useEffect(() => {
     if (!token) return undefined;
     const source = new EventSource(`${API_BASE}/attendance/events?token=${encodeURIComponent(token)}`);
     source.addEventListener("attendance-updated", () => refresh().catch(() => {}));
@@ -377,9 +387,7 @@ function App() {
     );
   }
 
-  const pages = admin
-    ? [["overview", "Overview", Activity], ["face-registration", "Face Registration", Camera], ["employees", "Employees", Users], ["payroll", "Payroll", Banknote], ["users", "Users", UserPlus], ["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]]
-    : [["kiosk", "Scan", Clock3], ["attendance", "Records", CalendarDays]];
+  const pages = availablePages;
 
   return (
     <main className="app-shell">

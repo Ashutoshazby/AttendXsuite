@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from ..config import get_settings
 from ..database import get_db
-from ..dependencies import current_user, require_role
+from ..dependencies import require_role
 from ..services.face_engine import best_match, create_embeddings
 from ..services.realtime import publish, subscribe, sse
 from ..utils.timezone import day_range_utc, local_date_key, local_time_label, now_utc
@@ -112,7 +112,7 @@ async def confirm(payload: ConfirmPayload, user=Depends(require_role("admin", "u
 
 
 @router.get("/today")
-async def today(user=Depends(require_role("admin", "user"))):
+async def today(user=Depends(require_role("admin"))):
     timezone = get_settings().company_timezone
     start, end = day_range_utc(tz=timezone)
     employees = await get_db().employees.find({"company_id": user["company_id"]}).to_list(100)
@@ -140,7 +140,7 @@ async def today(user=Depends(require_role("admin", "user"))):
 
 
 @router.get("/summary")
-async def summary(user=Depends(current_user)):
+async def summary(user=Depends(require_role("admin"))):
     start, end = day_range_utc(tz=get_settings().company_timezone)
     employees = await get_db().employees.find({"company_id": user["company_id"]}).to_list(100)
     records = await get_db().attendance.find({"company_id": user["company_id"], "timestamp": {"$gte": start, "$lte": end}}).to_list(500)

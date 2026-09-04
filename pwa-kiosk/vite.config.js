@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
-    allowedHosts: [".loca.lt", ".trycloudflare.com"],
+    allowedHosts: true,
     proxy: {
       "/auth": "http://127.0.0.1:8070",
       "/employees": "http://127.0.0.1:8070",
