@@ -13,6 +13,7 @@ class FaceRegisterPayload(BaseModel):
     employee_id: str
     image_base64: str | None = None
     images_base64: list[str] | None = None
+    face_descriptors: list[list[float]] | None = None
     replace_existing: bool = False
 
 
@@ -27,7 +28,7 @@ async def register_face(payload: FaceRegisterPayload, user=Depends(require_role(
     images = images[:5]
     if not images:
         raise HTTPException(status_code=422, detail="Capture at least one face photo")
-    faces = await collect_valid_faces(images)
+    faces = await collect_valid_faces(images, payload.face_descriptors or [])
     if not faces:
         raise HTTPException(status_code=422, detail="No clear face found. Use bright light, keep one face centered, and capture again.")
     for face in faces:
@@ -56,7 +57,14 @@ async def register_face(payload: FaceRegisterPayload, user=Depends(require_role(
     return {"success": True, "message": "Face registered", "data": {"employee_id": payload.employee_id, "registered_faces": len(samples), "model": faces[-1]["face"].get("model")}}
 
 
-async def collect_valid_faces(images: list[str]) -> list[dict]:
+async def collect_valid_faces(images: list[str], descriptors: list[list[float]] | None = None) -> list[dict]:
+    descriptor_faces = [
+        {"image": image, "face": {"embedding": descriptor, "model": "face-api", "quality": {"engine": "browser-face-api", "usable": True}}}
+        for image, descriptor in zip(images, descriptors or [])
+        if image and len(descriptor) == 128
+    ]
+    if descriptor_faces:
+        return descriptor_faces
     if len(images) > 1:
         try:
             faces = await create_embeddings(images)

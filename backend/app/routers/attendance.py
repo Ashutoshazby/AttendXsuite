@@ -18,6 +18,7 @@ PUNCH_GAP_SECONDS = 60
 
 class ScanPayload(BaseModel):
     frames: list[str]
+    face_descriptors: list[list[float]] | None = None
     device_id: str = "pwa-kiosk"
     timestamp: str | None = None
 
@@ -58,7 +59,8 @@ async def scan(payload: ScanPayload, user=Depends(require_role("admin", "user"))
     votes = []
     scores = []
     errors = []
-    faces = await create_embeddings(frames)
+    descriptors = [item for item in (payload.face_descriptors or []) if len(item) == 128]
+    faces = [{"embedding": descriptor, "model": "face-api"} for descriptor in descriptors[: settings.face_scan_frame_count]] if descriptors else await create_embeddings(frames)
     for face in faces:
         try:
             match = best_match(face["embedding"], employees)
@@ -79,7 +81,7 @@ async def scan(payload: ScanPayload, user=Depends(require_role("admin", "user"))
     employee = await get_db().employees.find_one({"company_id": user["company_id"], "employee_id": winner})
     action = await attendance_type(user["company_id"], winner, now_utc())
     sample = (employee.get("face_samples") or [])[-1] if employee else {}
-    return {"success": True, "data": {"employee_id": winner, "employee_name": employee["name"], "action": action, "face_preview": sample.get("image_base64", "")}}
+    return {"success": True, "data": {"employee_id": winner, "employee_name": employee["name"], "action": action, "confidence": round(average_score * 100), "face_preview": sample.get("image_base64", "")}}
 
 
 class ConfirmPayload(BaseModel):

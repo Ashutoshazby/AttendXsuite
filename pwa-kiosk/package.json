@@ -10,9 +10,10 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.1",
+    "@vladmandic/face-api": "^1.7.15",
+    "lucide-react": "^0.511.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "lucide-react": "^0.511.0"
+    "vite": "^6.0.1"
   }
 }

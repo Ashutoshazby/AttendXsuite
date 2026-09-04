@@ -3,7 +3,7 @@ from pymongo import ReturnDocument
 from pydantic import BaseModel, EmailStr
 from ..database import get_db
 from ..dependencies import require_role
-from ..services.face_engine import cosine_similarity
+from ..services.face_engine import cosine_similarity, face_api_score
 from ..utils.timezone import now_utc
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -33,7 +33,9 @@ async def ensure_unique_face(company_id: str, employee_id: str, embedding: list[
         return
     async for employee in get_db().employees.find({"company_id": company_id, "employee_id": {"$ne": employee_id}, "face_embeddings": {"$exists": True}}):
         for known in employee.get("face_embeddings", []):
-            if cosine_similarity(embedding, known) >= 0.985:
+            score = face_api_score(embedding, known) if model == "face-api" and len(known) == 128 else cosine_similarity(embedding, known)
+            duplicate_threshold = 0.5 if model == "face-api" else 0.985
+            if score >= duplicate_threshold:
                 raise HTTPException(status_code=409, detail=f"Face is already registered for {employee.get('name', employee['employee_id'])}")
 
 
